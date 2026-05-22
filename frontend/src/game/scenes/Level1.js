@@ -928,8 +928,8 @@ export class Level1 extends Phaser.Scene {
         toggleHeight: 54,
         toggleFontSize: '18px',
         labelFontSize: '15px',
-        sliderWidth: modalWidth - 150,
-        sliderStartX: 118,
+        sliderWidth: modalWidth - 128,
+        sliderStartX: 96,
         musicY: 122,
         sfxY: 176,
         closeRadius: 22,
@@ -1240,11 +1240,11 @@ export class Level1 extends Phaser.Scene {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
     const touchOptimized = width > 120;
-    const trackGlowHeight = touchOptimized ? 24 : 10;
-    const trackHeight = touchOptimized ? 10 : 3;
-    const knobGlowRadius = touchOptimized ? 16 : 7;
-    const knobRadius = touchOptimized ? 12 : 4.5;
-    const hitAreaHeight = touchOptimized ? 52 : 14;
+    const trackGlowHeight = touchOptimized ? 28 : 10;
+    const trackHeight = touchOptimized ? 12 : 3;
+    const knobGlowRadius = touchOptimized ? 18 : 7;
+    const knobRadius = touchOptimized ? 14 : 4.5;
+    const hitAreaHeight = touchOptimized ? 60 : 14;
     let activePointerId = null;
 
     const container = this.add.container(x, y).setScrollFactor(0);

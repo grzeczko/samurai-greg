@@ -274,9 +274,13 @@ export default function GameContainer() {
   const continueAfterPowerup = () => {
     setCurrentPowerup(null);
 
-    if (!resumePhaserScene()) {
-      eventBridge.emit('powerup:continue');
-    }
+    window.requestAnimationFrame(() => {
+      focusGameArea();
+
+      if (!resumePhaserScene()) {
+        eventBridge.emit('powerup:continue');
+      }
+    });
   };
 
   const handleHeroActionHover = useCallback(() => {

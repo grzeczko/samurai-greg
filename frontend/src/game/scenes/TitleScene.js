@@ -406,7 +406,10 @@ export class TitleScene extends Phaser.Scene {
       hudGlow.setFillStyle(0xf59e0b, 0.08);
     });
 
-    hudBg.on('pointerup', () => this.toggleAudioPanel());
+    hudBg.on('pointerdown', (pointer) => {
+      pointer.event?.preventDefault?.();
+      this.toggleAudioPanel();
+    });
 
     this.audioHud = this.add.container(0, 0, [hudGlow, hudBg, hudLabel]).setDepth(23);
     this.audioToggleGlow = hudGlow;
@@ -469,8 +472,8 @@ export class TitleScene extends Phaser.Scene {
         toggleHeight: 54,
         toggleFontSize: '18px',
         labelFontSize: '15px',
-        sliderWidth: modalWidth - 150,
-        sliderStartX: 118,
+        sliderWidth: modalWidth - 128,
+        sliderStartX: 96,
         musicY: 122,
         sfxY: 176,
         closeRadius: 22,
@@ -698,11 +701,12 @@ export class TitleScene extends Phaser.Scene {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
     const touchOptimized = width > 120;
-    const trackGlowHeight = touchOptimized ? 20 : 10;
-    const trackHeight = touchOptimized ? 8 : 3;
-    const knobGlowRadius = touchOptimized ? 13 : 7;
-    const knobRadius = touchOptimized ? 9 : 4.5;
-    const hitAreaHeight = touchOptimized ? 34 : 14;
+    const trackGlowHeight = touchOptimized ? 28 : 10;
+    const trackHeight = touchOptimized ? 12 : 3;
+    const knobGlowRadius = touchOptimized ? 18 : 7;
+    const knobRadius = touchOptimized ? 14 : 4.5;
+    const hitAreaHeight = touchOptimized ? 60 : 14;
+    let activePointerId = null;
 
     const container = this.add.container(x, y);
     const trackGlow = this.add.rectangle(width * 0.5, 0, width + 6, trackGlowHeight, 0xf59e0b, 0.04);
@@ -731,10 +735,41 @@ export class TitleScene extends Phaser.Scene {
       this.applyAudioSettings();
     };
 
+    const clearActivePointer = (pointer) => {
+      if (!pointer || activePointerId === pointer.id) {
+        activePointerId = null;
+      }
+    };
+
+    const handlePointerMove = (pointer) => {
+      if (activePointerId !== pointer.id || !pointer.isDown) {
+        return;
+      }
+
+      updateFromPointer(pointer);
+    };
+
     knob.on('drag', (pointer) => updateFromPointer(pointer));
     knob.on('pointerover', () => knobGlow.setFillStyle(0xf59e0b, 0.18));
     knob.on('pointerout', () => knobGlow.setFillStyle(0xf59e0b, 0.12));
-    trackHit.on('pointerdown', (pointer) => updateFromPointer(pointer));
+    knob.on('pointerdown', (pointer) => {
+      activePointerId = pointer.id;
+      updateFromPointer(pointer);
+    });
+    knob.on('pointerup', clearActivePointer);
+    knob.on('pointercancel', clearActivePointer);
+    trackHit.on('pointerdown', (pointer) => {
+      activePointerId = pointer.id;
+      updateFromPointer(pointer);
+    });
+    trackHit.on('pointermove', handlePointerMove);
+    trackHit.on('pointerup', clearActivePointer);
+    trackHit.on('pointerout', clearActivePointer);
+    this.input.on('pointermove', handlePointerMove);
+    this.input.on('pointerup', clearActivePointer);
+    this.input.on('gameout', () => {
+      activePointerId = null;
+    });
 
     container.add([trackGlow, trackHit, track, fill, knobGlow, knob]);
 
