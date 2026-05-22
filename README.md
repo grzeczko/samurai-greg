@@ -154,40 +154,43 @@ flowchart LR
 
 ## 7. Screenshots / GIFs
 
-The repository already contains game art, animation previews, and UI assets, but it does not yet include a finalized set of curated gameplay screenshots for documentation. A placeholder screenshots directory has been added at `docs/screenshots/` for clean README asset management.
+Curated screenshots live in `docs/screenshots/` and show the current game, codex, boss, resume, and contact experiences.
 
 ### Intro Screen
 
+The Phaser title screen introduces the samurai resume quest and keeps controls visible below the game frame.
+
 ![Intro Screen](./docs/screenshots/intro-screen.png)
 
+### Gameplay
+
+Core side-scrolling traversal with platforms, enemies, collectibles, combat controls, and HUD state.
+
+![Gameplay](./docs/screenshots/gameplay.png)
+
 ### Codex Popup
+
+Recovered codexes surface resume milestones as cinematic in-game rewards.
 
 ![Codex Popup](./docs/screenshots/codex-popup.png)
 
 ### Boss Battle
 
+The Demon Samurai encounter guards the final Golden Resume portal.
+
 ![Boss Battle](./docs/screenshots/boss-battle.png)
 
-### Gameplay
-
-![Gameplay](./docs/screenshots/gameplay.png)
-
 ### Contact Page
+
+The Laravel-backed contact route is styled as a quest dispatch chamber.
 
 ![Contact Page](./docs/screenshots/contact-page.png)
 
 ### Resume Page
 
+The traditional resume view remains available for recruiter-friendly scanning and downloads.
+
 ![Resume Page](./docs/screenshots/resume-page.png)
-
-Suggested future captures:
-
-- title / objective screen
-- codex reveal popup
-- mid-level traversal sequence
-- Demon Samurai battle frame
-- resume page layout
-- contact page success state
 
 ## 8. Controls
 

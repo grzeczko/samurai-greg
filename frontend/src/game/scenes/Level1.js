@@ -1584,7 +1584,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
-    this.damagePlayer('The Gatekeeper struck true.');
+    this.damagePlayer('Defend, dodge, and strike back.');
   }
 
   handleBossPlayerDefeat() {
