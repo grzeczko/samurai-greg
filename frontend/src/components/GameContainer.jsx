@@ -161,6 +161,28 @@ export default function GameContainer() {
     return true;
   }, [getLevelScene]);
 
+  const requestMobileFullscreen = useCallback(() => {
+    if (!mobileDeviceRef.current) {
+      return;
+    }
+
+    const target = gameAreaRef.current;
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+
+    if (!target || fullscreenElement) {
+      return;
+    }
+
+    const fullscreenRequest = target.requestFullscreen || target.webkitRequestFullscreen;
+
+    if (typeof fullscreenRequest !== 'function') {
+      return;
+    }
+
+    fullscreenRequest.call(target)
+      .catch?.(() => {});
+  }, []);
+
   useEffect(() => {
     // Only initialize if not already done
     if (gameInstanceRef.current) {
@@ -267,11 +289,14 @@ export default function GameContainer() {
   }, []);
 
   const handleHeroPressStart = useCallback(() => {
+    requestMobileFullscreen();
     eventBridge.emit('ui:press-start');
     focusGameArea();
-  }, [focusGameArea]);
+  }, [focusGameArea, requestMobileFullscreen]);
 
   const handleBeginJourney = useCallback(() => {
+    requestMobileFullscreen();
+
     if (isMobileGameDevice && !isLandscape) {
       setGamePhase('rotate');
       focusGameArea();
@@ -282,7 +307,7 @@ export default function GameContainer() {
     pendingStartRef.current = true;
     eventBridge.emit('objective:begin-journey');
     focusGameArea();
-  }, [focusGameArea, isLandscape, isMobileGameDevice]);
+  }, [focusGameArea, isLandscape, isMobileGameDevice, requestMobileFullscreen]);
 
   const helperCopy = isMobileGameDevice ? MOBILE_PHASE_HELPER_COPY : PHASE_HELPER_COPY;
   const controlsHelperText = gamePhase === 'title'

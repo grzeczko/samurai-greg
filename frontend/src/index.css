@@ -988,53 +988,139 @@ body {
   }
 }
 
+.game-shell--mobile .game-hud-strip {
+  display: none;
+}
+
+.game-shell--mobile:not(.game-phase-title) {
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #020307;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-header,
+.game-shell--mobile:not(.game-phase-title) .game-stage-progress,
+.game-shell--mobile:not(.game-phase-title) footer {
+  display: none;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-shell__main {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100vw;
+  height: 100vh;
+  height: 100svh;
+  padding: 0;
+  background: #020307;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-stage-section,
+.game-shell--mobile:not(.game-phase-title) .game-stage-shell,
+.game-shell--mobile:not(.game-phase-title) .game-stage-shell__frame {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100svh;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-stage-section {
+  scroll-margin-top: 0;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-stage-shell {
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.game-shell--mobile:not(.game-phase-title) .game-stage-shell__frame {
+  aspect-ratio: auto;
+}
+
+.game-shell--mobile:not(.game-phase-title) #phaser-container {
+  height: 100%;
+  width: 100%;
+}
+
 @media (orientation: landscape) {
+  .game-shell--mobile:not(.game-phase-title),
   .game-shell--mobile.game-shell--landscape {
     overflow-x: hidden;
     overscroll-behavior-y: contain;
   }
 
-  .game-shell--mobile.game-shell--landscape .game-shell__main {
+  .game-shell--mobile:not(.game-phase-title) {
+    min-height: 100vh;
+    min-height: 100svh;
+    background: #020307;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) .game-header,
+  .game-shell--mobile:not(.game-phase-title) .game-stage-progress,
+  .game-shell--mobile:not(.game-phase-title) footer,
+  .game-shell--mobile .game-hud-strip {
+    display: none;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) .game-shell__main {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: 100vw;
+    height: 100vh;
+    height: 100svh;
+    padding: 0;
+    background: #020307;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) .game-stage-section {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    height: 100svh;
+    scroll-margin-top: 0;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) .game-stage-shell {
+    width: 100vw;
+    height: 100vh;
+    height: 100svh;
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) .game-stage-shell__frame {
+    width: 100vw;
+    height: 100vh;
+    height: 100svh;
+    aspect-ratio: auto;
+  }
+
+  .game-shell--mobile:not(.game-phase-title) #phaser-container {
+    height: 100%;
+    width: 100%;
+  }
+
+  .game-shell--mobile.game-shell--landscape:not(.game-phase-title) .game-stage-shell::before,
+  .game-shell--mobile.game-shell--landscape:not(.game-phase-title) .game-stage-shell::after {
+    border-radius: 0;
+  }
+
+  .game-shell--mobile.game-shell--landscape.game-phase-title .game-shell__main {
     padding-inline: 0.45rem;
     padding-bottom: 0.6rem;
   }
 
-  .game-shell--mobile.game-shell--landscape .game-stage-section {
+  .game-shell--mobile.game-shell--landscape.game-phase-title .game-stage-section {
     scroll-margin-top: 0.4rem;
   }
 
-  .game-shell--mobile.game-shell--landscape.game-phase-playing .game-stage-section,
-  .game-shell--mobile.game-shell--landscape.game-phase-portal .game-stage-section,
-  .game-shell--mobile.game-shell--landscape.game-phase-complete .game-stage-section {
-    max-width: min(calc(100vw - 0.75rem), calc((100vh - 1rem) * 1.7067));
-    max-width: min(calc(100vw - 0.75rem), calc((100svh - 1rem) * 1.7067));
-  }
-
-  .game-shell--mobile.game-shell--landscape.game-phase-playing .game-hud-strip,
-  .game-shell--mobile.game-shell--landscape.game-phase-portal .game-hud-strip,
-  .game-shell--mobile.game-shell--landscape.game-phase-complete .game-hud-strip {
-    display: none;
-  }
-
-  .game-shell--mobile.game-shell--landscape .game-stage-shell {
+  .game-shell--mobile.game-shell--landscape.game-phase-title .game-stage-shell {
     border-radius: 0.9rem;
-  }
-
-  .game-shell--mobile.game-shell--landscape .game-hud-strip {
-    padding: 0.5rem 0.6rem;
-  }
-
-  .game-shell--mobile.game-shell--landscape .game-hud-strip__topline {
-    gap: 0.35rem;
-  }
-
-  .game-shell--mobile.game-shell--landscape .game-hud-strip__list {
-    margin-top: 0.45rem;
-    gap: 0.35rem 0.5rem;
-  }
-
-  .game-shell--mobile.game-shell--landscape .game-hud-strip__item {
-    gap: 0.28rem;
   }
 }
 
@@ -1044,7 +1130,7 @@ body {
     display: none;
   }
 
-  .game-shell--mobile .game-shell__main {
+  .game-shell--mobile.game-phase-title .game-shell__main {
     padding-top: 0.35rem;
   }
 
@@ -1157,66 +1243,87 @@ body {
 
   .game-shell--mobile .scroll-codex {
     --scroll-frame-pad: 0.75rem;
-    width: min(96%, 42rem);
+    width: min(96vw, 42rem);
     max-width: 100%;
-    max-height: calc(100% - 0.5rem);
+    max-height: calc(100vh - 0.35rem);
+    max-height: calc(100svh - 0.35rem);
     border-radius: 16px;
   }
 
   .game-shell--mobile .scroll-codex__header {
-    grid-template-columns: 3.5rem minmax(0, 1fr);
-    gap: 0.65rem;
-    padding: 0.8rem 0.85rem 0.15rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+    padding: 0.55rem 0.75rem 0.1rem;
     text-align: left;
   }
 
   .game-shell--mobile .scroll-codex__seal {
-    width: 54px;
-    height: 54px;
+    display: none;
+  }
+
+  .game-shell--mobile .scroll-codex__eyebrow {
+    display: none;
   }
 
   .game-shell--mobile .scroll-codex__title {
-    font-size: clamp(1.05rem, 3vw, 1.45rem);
+    max-width: 100%;
+    font-size: clamp(0.98rem, 2.6vw, 1.3rem);
+    line-height: 1.08;
   }
 
   .game-shell--mobile .scroll-codex__subtitle {
-    margin-top: 0.35rem;
-    font-size: 0.76rem;
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    line-height: 1.25;
   }
 
   .game-shell--mobile .scroll-codex__badges,
   .game-shell--mobile .scroll-codex__metadata {
-    margin-top: 0.35rem;
+    display: none;
   }
 
   .game-shell--mobile .scroll-codex__body {
-    width: calc(100% - 1rem);
-    max-width: calc(100vw - 2rem);
-    margin-top: 0.45rem;
-    padding: 0.75rem;
+    width: calc(100% - 1.3rem);
+    max-width: calc(100vw - 1.3rem);
+    margin: 0.35rem auto 0;
+    padding: 0.55rem 0.65rem;
+    border-radius: 12px;
   }
 
   .game-shell--mobile .scroll-codex__detail,
   .game-shell--mobile .scroll-codex__bullet {
-    font-size: 0.78rem;
-    line-height: 1.48;
+    font-size: 0.72rem;
+    line-height: 1.38;
+  }
+
+  .game-shell--mobile .scroll-codex__divider {
+    margin: 0.42rem 0;
+  }
+
+  .game-shell--mobile .scroll-codex__list {
+    gap: 0.32rem;
+    margin-top: 0;
   }
 
   .game-shell--mobile .scroll-codex__footer {
-    padding: 0.55rem 0.85rem 0.7rem;
+    flex: 0 0 auto;
+    padding: 0.34rem 0.75rem 0.5rem;
   }
 
   .game-shell--mobile .scroll-codex__actions {
     flex-direction: row;
     gap: 0.45rem;
-    padding-top: 0.45rem;
+    justify-content: center;
+    padding-top: 0.26rem;
   }
 
   .game-shell--mobile .scroll-button {
-    min-height: 2.25rem;
+    min-height: 2rem;
     min-width: 0;
-    padding: 0.55rem 0.8rem;
-    font-size: 0.68rem;
+    flex: 1 1 0;
+    padding: 0.42rem 0.62rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
   }
 }
 
