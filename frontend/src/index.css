@@ -1239,6 +1239,8 @@ body {
   .game-shell--mobile .scroll-codex-overlay {
     align-items: stretch;
     padding: 0.35rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .game-shell--mobile .scroll-codex {
@@ -1247,6 +1249,8 @@ body {
     max-width: 100%;
     max-height: calc(100vh - 0.35rem);
     max-height: calc(100svh - 0.35rem);
+    min-height: 0;
+    margin: auto;
     border-radius: 16px;
   }
 
@@ -1307,20 +1311,22 @@ body {
 
   .game-shell--mobile .scroll-codex__footer {
     flex: 0 0 auto;
-    padding: 0.34rem 0.75rem 0.5rem;
+    padding: 0.34rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .game-shell--mobile .scroll-codex__actions {
-    flex-direction: row;
+    flex-direction: column;
     gap: 0.45rem;
+    align-items: stretch;
     justify-content: center;
     padding-top: 0.26rem;
   }
 
   .game-shell--mobile .scroll-button {
     min-height: 2rem;
+    width: 100%;
     min-width: 0;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     padding: 0.42rem 0.62rem;
     font-size: 0.62rem;
     letter-spacing: 0.08em;
