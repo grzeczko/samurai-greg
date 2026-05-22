@@ -163,6 +163,7 @@ jobs:
           cd "$BACKEND_PATH"
 
           mkdir -p \
+            database \
             storage/app/private \
             storage/framework/cache \
             storage/framework/sessions \
@@ -170,6 +171,10 @@ jobs:
             storage/framework/views \
             storage/logs \
             bootstrap/cache
+
+          if [ "$(grep -E '^DB_CONNECTION=' .env 2>/dev/null | tail -n 1 | cut -d= -f2-)" = "sqlite" ]; then
+            touch database/database.sqlite
+          fi
 
           chmod -R u+rwX storage bootstrap/cache
 
