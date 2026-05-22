@@ -22,7 +22,7 @@ const OBJECTIVES = [
   'Restore Honor to the Realm',
 ];
 
-export default function ObjectiveScreen({ onBeginJourney }) {
+export default function ObjectiveScreen({ onBeginJourney, onBeginJourneyGesture }) {
   const [isLeaving, setIsLeaving] = useState(false);
   const transitionTimeoutRef = useRef(null);
 
@@ -37,6 +37,7 @@ export default function ObjectiveScreen({ onBeginJourney }) {
       return;
     }
 
+    onBeginJourneyGesture?.();
     setIsLeaving(true);
     transitionTimeoutRef.current = window.setTimeout(() => {
       onBeginJourney();

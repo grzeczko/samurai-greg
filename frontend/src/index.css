@@ -1126,7 +1126,7 @@ body {
 
 @media (max-height: 520px) and (orientation: landscape) {
   .game-shell--mobile .game-stage-progress,
-  .game-shell--mobile footer {
+  .game-shell--mobile > footer {
     display: none;
   }
 

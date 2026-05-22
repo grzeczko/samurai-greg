@@ -122,6 +122,7 @@ export default function GameContainer() {
   const mobileDeviceRef = useRef(false);
   const landscapeRef = useRef(true);
   const [gamePhase, setGamePhase] = useState('title');
+  const [gameBootError, setGameBootError] = useState(null);
   const [currentPowerup, setCurrentPowerup] = useState(null);
   const [collectedPowerups, setCollectedPowerups] = useState([]);
   const [completionPowerups, setCompletionPowerups] = useState([]);
@@ -229,13 +230,18 @@ export default function GameContainer() {
     eventBridge.on('quest:portal-open', handlePortalOpen);
     eventBridge.on('quest:complete', handleQuestComplete);
 
-    // Create Phaser game instance
-    const game = new Phaser.Game({
-      ...gameConfig,
-      scene: [TitleScene, Level1],
-    });
+    try {
+      const game = new Phaser.Game({
+        ...gameConfig,
+        scene: [TitleScene, Level1],
+      });
 
-    gameInstanceRef.current = game;
+      gameInstanceRef.current = game;
+      setGameBootError(null);
+    } catch (error) {
+      console.error('Failed to initialize Phaser game:', error);
+      setGameBootError(error instanceof Error ? error : new Error('Unable to initialize the game.'));
+    }
 
     // Cleanup on unmount
     return () => {
@@ -288,11 +294,15 @@ export default function GameContainer() {
     eventBridge.emit('ui:menu-confirm');
   }, []);
 
-  const handleHeroPressStart = useCallback(() => {
+  const unlockGameFromGesture = useCallback(() => {
     requestMobileFullscreen();
     eventBridge.emit('ui:press-start');
     focusGameArea();
   }, [focusGameArea, requestMobileFullscreen]);
+
+  const handleHeroPressStart = useCallback(() => {
+    unlockGameFromGesture();
+  }, [unlockGameFromGesture]);
 
   const handleBeginJourney = useCallback(() => {
     requestMobileFullscreen();
@@ -355,23 +365,32 @@ export default function GameContainer() {
           </div>
           <div className="game-stage-shell relative overflow-hidden rounded-[1.65rem] border border-orange-200/12 bg-[#050607] shadow-[0_28px_95px_rgba(0,0,0,0.62),0_0_65px_rgba(251,146,60,0.08)]">
             <div className="game-stage-shell__frame relative aspect-[1024/600] w-full overflow-hidden bg-black">
-              <div id="phaser-container" className="h-full w-full bg-black" />
-              {gamePhase === 'objective' && (
-                <ObjectiveScreen onBeginJourney={handleBeginJourney} />
+              {!gameBootError && <div id="phaser-container" className="h-full w-full bg-black" />}
+              {gameBootError && (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#050607] px-6 text-center text-white">
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Game Unavailable</p>
+                  <h2 className="max-w-xl text-2xl font-bold text-amber-50 sm:text-3xl">The interactive game failed to load on this device.</h2>
+                  <p className="max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
+                    Open the resume or contact page using the header actions while the game boot issue is investigated.
+                  </p>
+                </div>
               )}
-              {gamePhase === 'rotate' && (
+              {!gameBootError && gamePhase === 'objective' && (
+                <ObjectiveScreen onBeginJourney={handleBeginJourney} onBeginJourneyGesture={unlockGameFromGesture} />
+              )}
+              {!gameBootError && gamePhase === 'rotate' && (
                 <MobileRotatePrompt />
               )}
-              {gamePhase === 'complete' && (
+              {!gameBootError && gamePhase === 'complete' && (
                 <CompletionScreen collectedPowerups={completionList} />
               )}
-              {currentPowerup && (
+              {!gameBootError && currentPowerup && (
                 <ResumeCard
                   powerup={currentPowerup}
                   onContinue={continueAfterPowerup}
                 />
               )}
-              <MobileTouchControls visible={mobileTouchControlsVisible} />
+              {!gameBootError && <MobileTouchControls visible={mobileTouchControlsVisible} />}
             </div>
 
             <aside
