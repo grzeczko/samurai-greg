@@ -1,0 +1,1 @@
+Place gameplay screenshots and GIFs for the root README here.
