@@ -5,7 +5,10 @@ import { LEVEL_POWERUP_IDS, Level1 } from '../game/scenes/Level1.js';
 import { TitleScene } from '../game/scenes/TitleScene.js';
 import { eventBridge } from '../game/events.js';
 import { resumePowerups } from '../data/resumePowerups.js';
+import { useMobileGameDevice } from '../hooks/useMobileGameDevice.js';
 import GameHeader from './GameHeader.jsx';
+import MobileRotatePrompt from './MobileRotatePrompt.jsx';
+import MobileTouchControls from './MobileTouchControls.jsx';
 import ObjectiveScreen from './ObjectiveScreen.jsx';
 import ResumeCard from './ResumeCard.jsx';
 import { CompletionScreen } from './ResumeQuestOverlays.jsx';
@@ -59,6 +62,43 @@ const CONTROL_GROUPS = [
   },
 ];
 
+const MOBILE_CONTROL_GROUPS = [
+  {
+    id: 'movement',
+    label: 'Move',
+    keys: [
+      { label: '←' },
+      { label: '→' },
+    ],
+  },
+  {
+    id: 'jump',
+    label: 'Jump',
+    keys: [{ label: 'Tap' }],
+  },
+  {
+    id: 'attack',
+    label: 'Attack',
+    keys: [{ label: 'Strike' }],
+  },
+  {
+    id: 'dash',
+    label: 'Dash',
+    keys: [{ label: 'Burst' }],
+  },
+  {
+    id: 'throw',
+    label: 'Throw',
+    note: '5 / life',
+    keys: [{ label: 'Cast' }],
+  },
+  {
+    id: 'defend',
+    label: 'Defend',
+    keys: [{ label: 'Guard' }],
+  },
+];
+
 const PHASE_HELPER_COPY = {
   title: 'Begin your journey from the title screen within the game world.',
   objective: 'Read the quest briefing, then begin the journey.',
@@ -66,15 +106,39 @@ const PHASE_HELPER_COPY = {
   playing: 'Collect powerups to uncover the path of your resume.',
 };
 
+const MOBILE_PHASE_HELPER_COPY = {
+  title: 'Begin from the title screen, then rotate when prompted.',
+  rotate: 'Landscape unlocks the quest briefing.',
+  objective: 'Read the quest briefing, then begin the journey.',
+  portal: 'The final portal stirs within the realm. Step through it to complete the quest.',
+  playing: 'Use the on-screen controls to move, jump, strike, dash, throw, and guard.',
+};
+
 export default function GameContainer() {
   const gameInstanceRef = useRef(null);
   const gameAreaRef = useRef(null);
   const lastHeroHoverAtRef = useRef(0);
   const pendingStartRef = useRef(false);
+  const mobileDeviceRef = useRef(false);
+  const landscapeRef = useRef(true);
   const [gamePhase, setGamePhase] = useState('title');
   const [currentPowerup, setCurrentPowerup] = useState(null);
   const [collectedPowerups, setCollectedPowerups] = useState([]);
   const [completionPowerups, setCompletionPowerups] = useState([]);
+  const { isMobileGameDevice, isLandscape } = useMobileGameDevice();
+
+  useEffect(() => {
+    mobileDeviceRef.current = isMobileGameDevice;
+    landscapeRef.current = isLandscape;
+  }, [isMobileGameDevice, isLandscape]);
+
+  const focusGameArea = useCallback(() => {
+    gameAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    window.requestAnimationFrame(() => {
+      gameAreaRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
 
   const getLevelScene = useCallback(() => {
     const levelScene = gameInstanceRef.current?.scene.getScene('Level1');
@@ -121,7 +185,11 @@ export default function GameContainer() {
     };
 
     const handleTitleBegin = () => {
-      setGamePhase('objective');
+      setGamePhase(
+        mobileDeviceRef.current && !landscapeRef.current
+          ? 'rotate'
+          : 'objective'
+      );
     };
 
     const handleGameReady = () => {
@@ -162,6 +230,19 @@ export default function GameContainer() {
     };
   }, []);
 
+  useEffect(() => {
+    if (gamePhase !== 'rotate' || !isMobileGameDevice || !isLandscape) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      setGamePhase('objective');
+      focusGameArea();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusGameArea, gamePhase, isLandscape, isMobileGameDevice]);
+
   const continueAfterPowerup = () => {
     setCurrentPowerup(null);
 
@@ -169,14 +250,6 @@ export default function GameContainer() {
       eventBridge.emit('powerup:continue');
     }
   };
-
-  const focusGameArea = useCallback(() => {
-    gameAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    window.requestAnimationFrame(() => {
-      gameAreaRef.current?.focus({ preventScroll: true });
-    });
-  }, []);
 
   const handleHeroActionHover = useCallback(() => {
     const now = performance.now();
@@ -199,39 +272,60 @@ export default function GameContainer() {
   }, [focusGameArea]);
 
   const handleBeginJourney = useCallback(() => {
+    if (isMobileGameDevice && !isLandscape) {
+      setGamePhase('rotate');
+      focusGameArea();
+      return;
+    }
+
     setGamePhase('playing');
     pendingStartRef.current = true;
     eventBridge.emit('objective:begin-journey');
     focusGameArea();
-  }, [focusGameArea]);
+  }, [focusGameArea, isLandscape, isMobileGameDevice]);
 
+  const helperCopy = isMobileGameDevice ? MOBILE_PHASE_HELPER_COPY : PHASE_HELPER_COPY;
   const controlsHelperText = gamePhase === 'title'
-    ? PHASE_HELPER_COPY.title
+    ? helperCopy.title
+    : gamePhase === 'rotate'
+    ? helperCopy.rotate
     : gamePhase === 'objective'
-    ? PHASE_HELPER_COPY.objective
+    ? helperCopy.objective
     : gamePhase === 'portal'
-    ? PHASE_HELPER_COPY.portal
-    : PHASE_HELPER_COPY.playing;
+    ? helperCopy.portal
+    : helperCopy.playing;
 
   const collectedPowerupObjects = resumePowerups.filter(powerup => collectedPowerups.includes(powerup.id));
   const completionList = completionPowerups.length > 0 ? completionPowerups : collectedPowerupObjects;
+  const activeControlGroups = isMobileGameDevice ? MOBILE_CONTROL_GROUPS : CONTROL_GROUPS;
+  const controlHeading = isMobileGameDevice ? 'Touch Codex' : 'Control Codex';
+  const mobileTouchControlsVisible = isMobileGameDevice
+    && isLandscape
+    && (gamePhase === 'playing' || gamePhase === 'portal')
+    && !currentPowerup;
+  const shellClasses = [
+    'min-h-screen overflow-hidden bg-[#07080c] text-white',
+    isMobileGameDevice ? 'game-shell--mobile' : 'game-shell--desktop',
+    isLandscape ? 'game-shell--landscape' : 'game-shell--portrait',
+    `game-phase-${gamePhase}`,
+  ].join(' ');
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#07080c] text-white">
+    <div className={shellClasses}>
       <GameHeader
         onActionHover={handleHeroActionHover}
         onActionPress={handleHeroActionPress}
         onPressStart={handleHeroPressStart}
       />
 
-      <main className="px-4 pb-10 sm:px-6 lg:pb-14">
+      <main className="game-shell__main px-4 pb-10 sm:px-6 lg:pb-14">
         <section
           ref={gameAreaRef}
           tabIndex={-1}
           aria-label="Samurai Greg Phaser game"
-          className="mx-auto w-full max-w-5xl scroll-mt-6 focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-orange-300"
+          className="game-stage-section mx-auto w-full max-w-5xl scroll-mt-6 focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-orange-300"
         >
-          <div className="mb-3 text-center text-sm text-gray-400">
+          <div className="game-stage-progress mb-3 text-center text-sm text-gray-400">
             Skills collected: {collectedPowerups.length} / {LEVEL_POWERUP_IDS.length}
           </div>
           <div className="game-stage-shell relative overflow-hidden rounded-[1.65rem] border border-orange-200/12 bg-[#050607] shadow-[0_28px_95px_rgba(0,0,0,0.62),0_0_65px_rgba(251,146,60,0.08)]">
@@ -239,6 +333,9 @@ export default function GameContainer() {
               <div id="phaser-container" className="h-full w-full bg-black" />
               {gamePhase === 'objective' && (
                 <ObjectiveScreen onBeginJourney={handleBeginJourney} />
+              )}
+              {gamePhase === 'rotate' && (
+                <MobileRotatePrompt />
               )}
               {gamePhase === 'complete' && (
                 <CompletionScreen collectedPowerups={completionList} />
@@ -249,11 +346,12 @@ export default function GameContainer() {
                   onContinue={continueAfterPowerup}
                 />
               )}
+              <MobileTouchControls visible={mobileTouchControlsVisible} />
             </div>
 
             <aside
               aria-labelledby="quest-controls-heading"
-              className="game-hud-strip relative border-t border-white/6 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-5"
+              className={`game-hud-strip relative border-t border-white/6 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-5 ${isMobileGameDevice ? 'game-hud-strip--mobile' : 'game-hud-strip--desktop'}`}
             >
               <div className="game-hud-strip__inner relative z-10 mx-auto max-w-[70rem]">
                 <div className="game-hud-strip__topline flex flex-col items-center gap-1.5 text-center sm:gap-2 lg:flex-row lg:items-center lg:justify-between lg:text-left">
@@ -261,7 +359,7 @@ export default function GameContainer() {
                     id="quest-controls-heading"
                     className="game-hud-strip__eyebrow text-[0.56rem] font-semibold uppercase tracking-[0.3em] text-amber-100/55 sm:text-[0.6rem]"
                   >
-                    Control Codex
+                    {controlHeading}
                   </p>
                   <p className="game-hud-strip__helper text-[0.7rem] leading-4 text-white/42 sm:text-[0.74rem]">
                     {controlsHelperText}
@@ -269,7 +367,7 @@ export default function GameContainer() {
                 </div>
 
                 <ul className="game-hud-strip__list mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:mt-3 sm:gap-x-4 sm:gap-y-2 lg:flex-nowrap lg:justify-between lg:gap-x-3">
-                  {CONTROL_GROUPS.map((group, index) => (
+                  {activeControlGroups.map((group, index) => (
                     <li
                       key={group.id}
                       className="game-hud-strip__item"

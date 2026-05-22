@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PLAYER, WORLD } from '../utils/constants.js';
 import { ANIM_KEYS, SFX_KEYS, TEXTURE_KEYS, playSfx } from '../assets.js';
+import { gameControls } from '../input/controlsState.js';
 
 const BODY = {
   WIDTH: 16,
@@ -67,6 +68,7 @@ export class Player {
     this.throwsRemaining = THROW.MAX_COUNT;
 
     this.pressedKeys = new Set();
+    this.controlsState = gameControls;
 
     this.setupControls();
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
@@ -90,7 +92,10 @@ export class Player {
 
     this.handleKeyDown = (event) => this.trackKey(event, true);
     this.handleKeyUp = (event) => this.trackKey(event, false);
-    this.handleBlur = () => this.pressedKeys.clear();
+    this.handleBlur = () => {
+      this.pressedKeys.clear();
+      this.controlsState.resetAll();
+    };
 
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
@@ -134,6 +139,21 @@ export class Player {
     return codes.some(code => this.pressedKeys.has(code));
   }
 
+  syncKeyboardControls() {
+    this.controlsState.setKeyboardState({
+      left: this.cursors.left.isDown || this.keys.a.isDown || this.isPressed('ArrowLeft', 'KeyA'),
+      right: this.cursors.right.isDown || this.keys.d.isDown || this.isPressed('ArrowRight', 'KeyD'),
+      jump: this.cursors.up.isDown
+        || this.keys.w.isDown
+        || this.keys.space.isDown
+        || this.isPressed('ArrowUp', 'KeyW', 'Space'),
+      attack: this.keys.x.isDown || this.keys.j.isDown || this.isPressed('KeyX', 'KeyJ'),
+      dash: this.keys.shift.isDown || this.keys.k.isDown || this.isPressed('ShiftLeft', 'ShiftRight', 'KeyK'),
+      throw: this.keys.c.isDown || this.keys.l.isDown || this.isPressed('KeyC', 'KeyL'),
+      defend: this.cursors.down.isDown || this.keys.s.isDown || this.isPressed('ArrowDown', 'KeyS'),
+    });
+  }
+
   update() {
     const body = this.sprite.body;
     const now = this.scene.time.now;
@@ -149,18 +169,13 @@ export class Player {
       this.stopDash();
     }
 
-    const movingLeft = this.cursors.left.isDown || this.keys.a.isDown || this.isPressed('ArrowLeft', 'KeyA');
-    const movingRight = this.cursors.right.isDown || this.keys.d.isDown || this.isPressed('ArrowRight', 'KeyD');
-    const isJumpDown = this.cursors.up.isDown
-      || this.keys.w.isDown
-      || this.keys.space.isDown
-      || this.isPressed('ArrowUp', 'KeyW', 'Space');
-    const jumpJustPressed = isJumpDown && !this.wasJumpDown;
-    const isDefendDown = this.cursors.down.isDown
-      || this.keys.s.isDown
-      || this.isPressed('ArrowDown', 'KeyS');
+    this.syncKeyboardControls();
+    const controls = this.controlsState.snapshot();
+    const movingLeft = controls.left;
+    const movingRight = controls.right;
+    const jumpJustPressed = controls.justPressed.jump;
+    const isDefendDown = controls.defend;
 
-    this.wasJumpDown = isJumpDown;
     this.updateWallState();
     this.updateDefendState(isDefendDown);
 
@@ -169,7 +184,7 @@ export class Player {
     }
 
     if (!this.isDefending) {
-      this.handleDashInput();
+      this.handleDashInput(controls);
     } else {
       body.setVelocityX(0);
     }
@@ -189,8 +204,8 @@ export class Player {
     }
 
     if (!this.isDefending) {
-      this.handleAttackInput();
-      this.handleThrowInput();
+      this.handleAttackInput(controls);
+      this.handleThrowInput(controls);
     }
     this.syncSword();
     this.updateAnimation(movingLeft, movingRight);
@@ -306,13 +321,8 @@ export class Player {
     }
   }
 
-  handleDashInput() {
-    const isDashDown = this.keys.shift.isDown
-      || this.keys.k.isDown
-      || this.isPressed('ShiftLeft', 'ShiftRight', 'KeyK');
-    const dashJustPressed = isDashDown && !this.wasDashDown;
-
-    this.wasDashDown = isDashDown;
+  handleDashInput(controls) {
+    const dashJustPressed = controls.justPressed.dash;
 
     if (!dashJustPressed || this.scene.time.now < this.nextDashAt || this.isAttacking || this.isThrowing) {
       return;
@@ -331,10 +341,8 @@ export class Player {
     this.sprite.body.setAllowGravity(true);
   }
 
-  handleAttackInput() {
-    const isSwinging = Phaser.Input.Keyboard.JustDown(this.keys.x)
-      || Phaser.Input.Keyboard.JustDown(this.keys.j)
-      || this.isPressed('KeyX', 'KeyJ');
+  handleAttackInput(controls) {
+    const isSwinging = controls.attack || controls.justPressed.attack;
 
     if (!isSwinging || this.scene.time.now < this.nextAttackAt || this.isDashing || this.isThrowing) {
       return;
@@ -357,9 +365,8 @@ export class Player {
     });
   }
 
-  handleThrowInput() {
-    const isThrowing = Phaser.Input.Keyboard.JustDown(this.keys.c)
-      || Phaser.Input.Keyboard.JustDown(this.keys.l);
+  handleThrowInput(controls) {
+    const isThrowing = controls.justPressed.throw;
 
     if (!isThrowing
       || this.throwsRemaining <= 0
@@ -583,6 +590,7 @@ export class Player {
     window.removeEventListener('keyup', this.handleKeyUp);
     window.removeEventListener('blur', this.handleBlur);
     this.pressedKeys.clear();
+    this.controlsState.resetAll();
     this.clearThrowProjectiles();
     this.throwProjectiles.destroy(true);
     this.swordHitbox.destroy();

@@ -10,7 +10,7 @@ const QUEST_LINKS = {
 
 function OverlayShell({ children }) {
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/85 p-6 text-white backdrop-blur-sm">
+    <div className="quest-overlay-shell absolute inset-0 z-20 flex items-center justify-center bg-slate-950/85 p-6 text-white backdrop-blur-sm">
       {children}
     </div>
   );
@@ -73,7 +73,7 @@ export function CompletionScreen({ collectedPowerups }) {
 
   return (
     <OverlayShell>
-      <div className="w-full max-w-4xl rounded-lg border border-emerald-300/40 bg-gray-900/95 px-8 py-7 shadow-2xl">
+      <div className="quest-completion-panel w-full max-w-4xl rounded-lg border border-emerald-300/40 bg-gray-900/95 px-8 py-7 shadow-2xl">
         <div className="text-center">
           <p className="mb-3 text-sm font-bold uppercase tracking-widest text-emerald-300">
             Final portal reached
