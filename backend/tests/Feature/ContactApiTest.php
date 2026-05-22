@@ -132,7 +132,7 @@ class ContactApiTest extends TestCase
                 'subject' => 'Spam',
                 'message' => 'Spam message',
                 'recaptcha_token' => 'valid-token',
-                'portfolio_url' => 'https://spam.example.com',
+                'contact_reference' => 'https://spam.example.com',
             ]);
 
         $response

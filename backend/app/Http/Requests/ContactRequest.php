@@ -29,7 +29,7 @@ class ContactRequest extends FormRequest
             'subject' => ['nullable', 'string', 'max:160'],
             'message' => ['required', 'string', 'max:5000'],
             'recaptcha_token' => ['required', 'string', 'max:4096'],
-            'portfolio_url' => ['nullable', 'string', 'max:255'],
+            'contact_reference' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -41,7 +41,7 @@ class ContactRequest extends FormRequest
             'subject' => $this->sanitizeSingleLine($this->input('subject')),
             'message' => $this->sanitizeMultiline($this->input('message')),
             'recaptcha_token' => trim((string) $this->input('recaptcha_token', '')),
-            'portfolio_url' => $this->sanitizeSingleLine($this->input('portfolio_url')),
+            'contact_reference' => $this->sanitizeSingleLine($this->input('contact_reference')),
         ]);
     }
 
@@ -56,7 +56,7 @@ class ContactRequest extends FormRequest
 
     public function honeypotTriggered(): bool
     {
-        return filled($this->input('portfolio_url'));
+        return filled($this->input('contact_reference'));
     }
 
     /**

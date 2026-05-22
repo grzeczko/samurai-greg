@@ -1060,7 +1060,7 @@ body {
 
   .game-shell--mobile:not(.game-phase-title) .game-header,
   .game-shell--mobile:not(.game-phase-title) .game-stage-progress,
-  .game-shell--mobile:not(.game-phase-title) footer,
+  .game-shell--mobile:not(.game-phase-title) > footer,
   .game-shell--mobile .game-hud-strip {
     display: none;
   }

@@ -13,7 +13,7 @@ const initialFormState = {
   email: '',
   subject: '',
   message: '',
-  portfolio_url: '',
+  contact_reference: '',
 };
 
 const OPEN_TO_ITEMS = [
@@ -279,7 +279,7 @@ export default function ContactForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+          <form onSubmit={handleSubmit} autoComplete="off" className="grid gap-4 sm:grid-cols-2 sm:gap-5">
             <div className="sm:col-span-1">
               <label htmlFor="contact-name" className="contact-quest-panel__label mb-2 block text-sm font-bold uppercase tracking-[0.18em] text-amber-100/72">
                 Name
@@ -335,18 +335,19 @@ export default function ContactForm() {
               {renderFieldError('subject')}
             </div>
 
-            <div className="sr-only" aria-hidden="true">
-              <label htmlFor="contact-portfolio-url">Portfolio URL</label>
+            <div className="hidden" aria-hidden="true">
+              <label htmlFor="contact-reference">Leave this field empty</label>
               <input
-                id="contact-portfolio-url"
-                name="portfolio_url"
+                id="contact-reference"
+                name="contact_reference"
                 type="text"
                 tabIndex={-1}
-                autoComplete="nope"
+                autoComplete="off"
                 data-1p-ignore="true"
                 data-lpignore="true"
                 data-form-type="other"
-                value={formData.portfolio_url}
+                spellCheck="false"
+                value={formData.contact_reference}
                 onChange={handleChange}
               />
             </div>
