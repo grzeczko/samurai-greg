@@ -10,6 +10,7 @@ export async function sendContactMessage(formData) {
     body: JSON.stringify(formData),
   });
 
+  const contentType = response.headers.get('content-type') || '';
   const payload = await response.json().catch(() => null);
 
   if (import.meta.env.DEV) {
@@ -24,9 +25,14 @@ export async function sendContactMessage(formData) {
   const isValidJsonSuccess = payload && typeof payload === 'object' && payload.success === true;
 
   if (!response.ok || payload?.success === false || !isValidJsonSuccess) {
+    const responseLooksLikeHtml = contentType.includes('text/html');
+    const message = responseLooksLikeHtml
+      ? 'The contact endpoint is misconfigured in production and returned HTML instead of the API response.'
+      : payload?.message
+        || `The contact service returned an unexpected response (status ${response.status}). Please try again in a moment.`;
+
     const error = new Error(
-      payload?.message
-      || 'The contact service returned an unexpected response. Please try again in a moment.'
+      message
     );
     error.status = response.status;
     error.errors = payload?.errors || {};

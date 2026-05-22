@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    Options -MultiViews -Indexes
+    RewriteEngine On
+
+    # Send clean API requests through a local PHP bridge inside public_html.
+    RewriteRule ^api(/.*)?$ api/index.php [L,QSA]
+
+    # Serve existing Vite assets and public files directly.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # React Router fallback.
+    RewriteRule ^ index.html [L]
+</IfModule>

@@ -49,26 +49,11 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Add SiteGround Apache routing
+      - name: Sync SiteGround Apache routing
         run: |
           set -euo pipefail
-          cat > frontend/dist/.htaccess <<'HTACCESS'
-          <IfModule mod_rewrite.c>
-              Options -MultiViews -Indexes
-              RewriteEngine On
+          cp frontend/public/.htaccess frontend/dist/.htaccess
 
-              # Send clean API requests to Laravel while keeping the backend outside public_html.
-              RewriteRule ^api(/.*)?$ ../backend/public/index.php [L,QSA]
-
-              # Serve existing Vite assets and public files directly.
-              RewriteCond %{REQUEST_FILENAME} -f [OR]
-              RewriteCond %{REQUEST_FILENAME} -d
-              RewriteRule ^ - [L]
-
-              # React Router fallback.
-              RewriteRule ^ index.html [L]
-          </IfModule>
-          HTACCESS
 
       - name: Setup PHP and Composer
         uses: shivammathur/setup-php@v2
