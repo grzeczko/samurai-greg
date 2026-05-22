@@ -220,25 +220,33 @@ The experience is built to feel cinematic rather than purely mechanical. Title m
 
 ## 11. Deployment
 
-### Frontend Deployment
+### Production: SiteGround / rzeczko.com
 
-- Build the frontend with `cd frontend && npm run build`
-- Deploy the generated `frontend/dist/` contents to your public web root
-- Ensure static assets and downloadable resume files are included in the build output
+Production deploys are handled by `.github/workflows/deploy-siteground.yml`.
 
-### Backend Deployment
+- Pushes to `main` deploy to `https://rzeczko.com`
+- Manual deploys are available through GitHub Actions `workflow_dispatch`
+- `frontend/` is built with `npm ci` and `npm run build`
+- `frontend/dist/` is synced to `$SITE_ROOT/public_html`
+- `backend/` is synced to `$SITE_ROOT/backend`
+- Server `.env`, `storage/`, `public/storage`, `vendor/`, and uploaded/runtime files are preserved
+- Laravel release commands run on SiteGround after rsync, including Composer install, migrations, and cache rebuilds
 
-- Deploy the Laravel app from `backend/`
-- Keep only `backend/public` web accessible
-- Configure the frontend to target `/api/contact` when a clean rewrite/proxy is available
-- Fallback routing can point to `/backend/public/api/contact` if necessary
+Required GitHub Secrets:
 
-### Environment Setup
+```text
+SSH_HOST
+SSH_USER
+SSH_KEY
+SSH_PORT
+SITE_ROOT=/home/customer/www/rzeczko.com
+FRONTEND_ENV_FILE
+LARAVEL_ENV_FILE
+```
 
-- Copy `frontend/.env.example` to `frontend/.env`
-- Copy `backend/.env.example` to `backend/.env`
-- fill in mail and reCAPTCHA values on the backend
-- set the frontend contact endpoint appropriately for local or production use
+The generated production `.htaccess` routes `/api/*` to Laravel and falls back to `index.html` for React Router. The frontend should use `VITE_CONTACT_API_URL=https://rzeczko.com/api/contact` when that rewrite is active.
+
+Full setup notes live in [`docs/deployment-siteground.md`](./docs/deployment-siteground.md).
 
 ### Build / Release Commands
 
@@ -304,3 +312,9 @@ php artisan serve
 This project is intended to be released under the MIT License.
 
 If you want to formalize that for the public repository, add a root `LICENSE` file with the standard MIT text.
+
+<div align="center">
+
+[Built with Phaser 4](https://phaser.io/phaser4) | [GitHub Repo](https://github.com/grzeczko/samurai-greg)
+
+</div>

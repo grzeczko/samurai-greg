@@ -1,0 +1,185 @@
+name: Deploy to SiteGround
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: siteground-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy rzeczko.com
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SITE_ROOT: ${{ secrets.SITE_ROOT }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Create frontend environment
+        env:
+          FRONTEND_ENV_FILE: ${{ secrets.FRONTEND_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$FRONTEND_ENV_FILE" > frontend/.env
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Add SiteGround Apache routing
+        run: |
+          set -euo pipefail
+          cat > frontend/dist/.htaccess <<'HTACCESS'
+          <IfModule mod_rewrite.c>
+              Options -MultiViews -Indexes
+              RewriteEngine On
+
+              # Send clean API requests to Laravel while keeping the backend outside public_html.
+              RewriteRule ^api(/.*)?$ ../backend/public/index.php [L,QSA]
+
+              # Serve existing Vite assets and public files directly.
+              RewriteCond %{REQUEST_FILENAME} -f [OR]
+              RewriteCond %{REQUEST_FILENAME} -d
+              RewriteRule ^ - [L]
+
+              # React Router fallback.
+              RewriteRule ^ index.html [L]
+          </IfModule>
+          HTACCESS
+
+      - name: Setup PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate backend Composer files
+        working-directory: backend
+        run: composer validate --no-check-publish --strict
+
+      - name: Create backend environment from secret
+        env:
+          LARAVEL_ENV_FILE: ${{ secrets.LARAVEL_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p .deploy
+          printf '%s\n' "$LARAVEL_ENV_FILE" > backend/.env
+          cp backend/.env .deploy/backend.env
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/siteground_key
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directories
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/siteground_key -p "$SSH_PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
+            "mkdir -p '$SITE_ROOT/public_html' '$SITE_ROOT/backend' '$SITE_ROOT/.deploy'"
+
+      - name: Deploy frontend build
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude='.well-known/' \
+            --exclude='cgi-bin/' \
+            -e "ssh -i ~/.ssh/siteground_key -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            frontend/dist/ "$SSH_USER@$SSH_HOST:$SITE_ROOT/public_html/"
+
+      - name: Deploy backend app
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.phpunit.result.cache' \
+            --exclude='node_modules/' \
+            --exclude='public/storage' \
+            --exclude='storage/' \
+            --exclude='tests/' \
+            --exclude='vendor/' \
+            --exclude='*.log' \
+            --exclude='*.pem' \
+            --exclude='*.key' \
+            --exclude='database/*.sqlite' \
+            -e "ssh -i ~/.ssh/siteground_key -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            backend/ "$SSH_USER@$SSH_HOST:$SITE_ROOT/backend/"
+
+      - name: Upload backend environment seed
+        run: |
+          set -euo pipefail
+          rsync -az \
+            -e "ssh -i ~/.ssh/siteground_key -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            .deploy/backend.env "$SSH_USER@$SSH_HOST:$SITE_ROOT/.deploy/backend.env"
+
+      - name: Run SiteGround backend release commands
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/siteground_key -p "$SSH_PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" "SITE_ROOT='$SITE_ROOT' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          BACKEND_PATH="$SITE_ROOT/backend"
+          ENV_SOURCE="$SITE_ROOT/.deploy/backend.env"
+
+          if [ ! -f "$BACKEND_PATH/.env" ] && [ -s "$ENV_SOURCE" ]; then
+            cp "$ENV_SOURCE" "$BACKEND_PATH/.env"
+            chmod 600 "$BACKEND_PATH/.env"
+          fi
+
+          rm -f "$ENV_SOURCE"
+
+          cd "$BACKEND_PATH"
+
+          mkdir -p \
+            storage/app/private \
+            storage/framework/cache \
+            storage/framework/sessions \
+            storage/framework/testing \
+            storage/framework/views \
+            storage/logs \
+            bootstrap/cache
+
+          chmod -R u+rwX storage bootstrap/cache
+
+          composer install --no-dev --optimize-autoloader
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan route:clear
+          php artisan view:clear
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          REMOTE

@@ -295,6 +295,8 @@ export default function GameContainer() {
       </main>
       <footer className="border-t border-white/10 py-6 text-center text-sm text-gray-400">
         Built with <a href="https://phaser.io" target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 font-semibold">Phaser 4</a>
+        <span className="mx-2 text-gray-500">|</span>
+        <a href="https://github.com/grzeczko/samurai-greg" target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 font-semibold">GitHub Repo</a>
       </footer>
     </div>
   );

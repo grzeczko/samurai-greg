@@ -13,7 +13,7 @@ export default function GameHeader({ onActionHover, onActionPress, onPressStart 
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.2),transparent_34%),linear-gradient(180deg,rgba(7,8,12,0.98),rgba(17,24,39,0.88)_48%,rgba(7,8,12,0.96))]" />
       <div className="game-header__fog pointer-events-none absolute inset-x-0 top-0 -z-10 h-full opacity-70" />
 
-      <div className="absolute right-4 top-4 flex items-center gap-2 sm:right-6 sm:top-5">
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 sm:absolute sm:right-6 sm:top-5 sm:mb-0 sm:justify-end">
         <Link
           to="/resume"
           aria-label="View Gregory resume"
