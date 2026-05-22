@@ -893,7 +893,7 @@ export class Level1 extends Phaser.Scene {
   }
 
   getGameAudioPanelLayout() {
-    const useLargeTouchLayout = this.sys.game.device.input.touch && this.scale.width <= 1024;
+    const useLargeTouchLayout = this.sys.game.device.input.touch && !this.sys.game.device.os.desktop;
 
     if (useLargeTouchLayout) {
       const modalWidth = Math.max(260, this.scale.width - 24);
@@ -943,6 +943,24 @@ export class Level1 extends Phaser.Scene {
       closeRadius: 10,
       closeY: 16,
     };
+  }
+
+  setGameAudioPanelInputEnabled(enabled) {
+    const interactiveTargets = [
+      this.gameAudioPanelBackdrop,
+      this.gameAudioPanelCloseButton,
+      this.gameSoundInlineToggle,
+      this.gameMusicSlider?.track,
+      this.gameMusicSlider?.knob,
+      this.gameSfxSlider?.track,
+      this.gameSfxSlider?.knob,
+    ].filter(Boolean);
+
+    interactiveTargets.forEach((target) => {
+      if (target.input) {
+        target.input.enabled = enabled;
+      }
+    });
   }
 
   createBossHud() {
@@ -1123,6 +1141,8 @@ export class Level1 extends Phaser.Scene {
     this.gameSoundStatusText = statusText;
     this.gameSoundInlineLabel = soundToggleLabel;
     this.gameSoundInlineToggle = soundToggle;
+    this.gameAudioPanelCloseButton = closeButton;
+    this.setGameAudioPanelInputEnabled(false);
 
     return panel;
   }
@@ -1153,6 +1173,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    this.setGameAudioPanelInputEnabled(false);
     this.tweens.killTweensOf(this.gameAudioPanel);
     this.tweens.add({
       targets: this.gameAudioPanel,
@@ -1217,6 +1238,7 @@ export class Level1 extends Phaser.Scene {
 
     const show = !this.gameAudioPanel.visible;
     this.gameAudioPanel.setVisible(true);
+    this.setGameAudioPanelInputEnabled(show);
     this.tweens.killTweensOf(this.gameAudioPanel);
     this.tweens.add({
       targets: this.gameAudioPanel,

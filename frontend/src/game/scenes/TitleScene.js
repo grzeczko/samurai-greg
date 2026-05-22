@@ -439,7 +439,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   getTitleAudioPanelLayout() {
-    const useLargeTouchLayout = this.sys.game.device.input.touch && this.scale.width <= 1024;
+    const useLargeTouchLayout = this.sys.game.device.input.touch && !this.sys.game.device.os.desktop;
 
     if (useLargeTouchLayout) {
       const modalWidth = Math.max(260, this.scale.width - 24);
@@ -489,6 +489,24 @@ export class TitleScene extends Phaser.Scene {
       closeRadius: 10,
       closeY: 16,
     };
+  }
+
+  setTitleAudioPanelInputEnabled(enabled) {
+    const interactiveTargets = [
+      this.audioPanelBackdrop,
+      this.audioPanelCloseButton,
+      this.audioToggleInlineBg,
+      this.musicSlider?.track,
+      this.musicSlider?.knob,
+      this.sfxSlider?.track,
+      this.sfxSlider?.knob,
+    ].filter(Boolean);
+
+    interactiveTargets.forEach((target) => {
+      if (target.input) {
+        target.input.enabled = enabled;
+      }
+    });
   }
 
   createAudioPanel(x, y) {
@@ -594,6 +612,8 @@ export class TitleScene extends Phaser.Scene {
     this.audioToggleInlineStatus = statusText;
     this.audioToggleInlineLabel = soundToggleLabel;
     this.audioToggleInlineBg = soundToggle;
+    this.audioPanelCloseButton = closeButton;
+    this.setTitleAudioPanelInputEnabled(false);
 
     return panel;
   }
@@ -624,6 +644,7 @@ export class TitleScene extends Phaser.Scene {
       return;
     }
 
+    this.setTitleAudioPanelInputEnabled(false);
     this.tweens.killTweensOf(this.audioPanel);
     this.tweens.add({
       targets: this.audioPanel,
@@ -685,6 +706,7 @@ export class TitleScene extends Phaser.Scene {
 
     const show = !this.audioPanel.visible;
     this.audioPanel.setVisible(true);
+    this.setTitleAudioPanelInputEnabled(show);
     this.tweens.killTweensOf(this.audioPanel);
     this.tweens.add({
       targets: this.audioPanel,
