@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS = {
   musicEnabled: false,
 };
 
+const MIN_AUDIBLE_VOLUME = 0.05;
+
 const clamp01 = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 
 class AudioManager {
@@ -91,6 +93,8 @@ class AudioManager {
       return false;
     }
 
+    this.ensureAudibleSettings();
+
     if (!this.settings.musicEnabled) {
       this.setMusicEnabled(true);
     }
@@ -101,12 +105,55 @@ class AudioManager {
   setMusicEnabled(value) {
     this.settings.musicEnabled = !!value;
     this.musicPreferenceEnabled = !!value;
+
+    if (this.settings.musicEnabled) {
+      this.ensureAudibleSettings();
+    }
+
     this.saveSettings();
   }
 
   setMuted(value) {
     this.settings.muted = !!value;
+
+    if (!this.settings.muted) {
+      this.ensureAudibleSettings();
+    }
+
     this.saveSettings();
+  }
+
+  ensureAudibleSettings() {
+    let didChange = false;
+
+    if (this.settings.masterVolume < MIN_AUDIBLE_VOLUME) {
+      this.settings.masterVolume = DEFAULT_SETTINGS.masterVolume;
+      didChange = true;
+    }
+
+    if (this.settings.musicVolume < MIN_AUDIBLE_VOLUME) {
+      this.settings.musicVolume = DEFAULT_SETTINGS.musicVolume;
+      didChange = true;
+    }
+
+    if (this.settings.sfxVolume < MIN_AUDIBLE_VOLUME) {
+      this.settings.sfxVolume = DEFAULT_SETTINGS.sfxVolume;
+      didChange = true;
+    }
+
+    if (this.settings.ambientVolume < MIN_AUDIBLE_VOLUME) {
+      this.settings.ambientVolume = DEFAULT_SETTINGS.ambientVolume;
+      didChange = true;
+    }
+
+    if (this.settings.uiVolume < MIN_AUDIBLE_VOLUME) {
+      this.settings.uiVolume = DEFAULT_SETTINGS.uiVolume;
+      didChange = true;
+    }
+
+    if (didChange) {
+      this.saveSettings();
+    }
   }
 
   setMasterVolume(value) {

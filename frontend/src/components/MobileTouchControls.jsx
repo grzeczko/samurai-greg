@@ -9,6 +9,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { gameControls } from '../game/input/controlsState.js';
+import { eventBridge } from '../game/events.js';
 
 function TouchButton({ action, ariaLabel, className = '', children }) {
   const setPressed = useCallback((event, isDown) => {
@@ -16,6 +17,7 @@ function TouchButton({ action, ariaLabel, className = '', children }) {
     event.stopPropagation();
 
     if (isDown) {
+      eventBridge.emit('ui:press-start');
       event.currentTarget.setPointerCapture?.(event.pointerId);
     } else {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
