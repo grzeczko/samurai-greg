@@ -725,6 +725,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    this.hideGameAudioPanel(true);
     this.isGameActive = false;
     this.player.getSprite().body.setVelocity(0, 0);
     this.player.getSwordHitbox().body.enable = false;
@@ -737,6 +738,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    this.hideGameAudioPanel(true);
     this.isGameActive = true;
     this.enemies.forEach(enemy => enemy.resumePatrol());
     this.physics.resume();
@@ -880,7 +882,10 @@ export class Level1 extends Phaser.Scene {
       buttonGlow.setFillStyle(0xf59e0b, 0.08);
     });
 
-    button.on('pointerup', () => this.toggleGameAudioPanel());
+    button.on('pointerdown', (pointer) => {
+      pointer.event?.preventDefault?.();
+      this.toggleGameAudioPanel();
+    });
 
     this.gameSoundButtonGlow = buttonGlow;
     this.gameSoundButton = button;
@@ -1202,13 +1207,21 @@ export class Level1 extends Phaser.Scene {
     this.input.on('pointerdown', this.handleGamePanelOutsideClick, this);
   }
 
-  hideGameAudioPanel() {
+  hideGameAudioPanel(immediate = false) {
     if (!this.gameAudioPanel?.visible) {
       return;
     }
 
     this.setGameAudioPanelInputEnabled(false);
     this.tweens.killTweensOf(this.gameAudioPanel);
+
+    if (immediate) {
+      this.gameAudioPanel.setVisible(false);
+      this.gameAudioPanel.setAlpha(0);
+      this.gameAudioPanel.setScale(0.94);
+      return;
+    }
+
     this.tweens.add({
       targets: this.gameAudioPanel,
       alpha: 0,
@@ -1227,11 +1240,12 @@ export class Level1 extends Phaser.Scene {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
     const touchOptimized = width > 120;
-    const trackGlowHeight = touchOptimized ? 20 : 10;
-    const trackHeight = touchOptimized ? 8 : 3;
-    const knobGlowRadius = touchOptimized ? 13 : 7;
-    const knobRadius = touchOptimized ? 9 : 4.5;
-    const hitAreaHeight = touchOptimized ? 34 : 14;
+    const trackGlowHeight = touchOptimized ? 24 : 10;
+    const trackHeight = touchOptimized ? 10 : 3;
+    const knobGlowRadius = touchOptimized ? 16 : 7;
+    const knobRadius = touchOptimized ? 12 : 4.5;
+    const hitAreaHeight = touchOptimized ? 52 : 14;
+    let activePointerId = null;
 
     const container = this.add.container(x, y).setScrollFactor(0);
     const trackGlow = this.add.rectangle(width * 0.5, 0, width + 6, trackGlowHeight, 0xf59e0b, 0.04)
@@ -1264,10 +1278,41 @@ export class Level1 extends Phaser.Scene {
       this.startGameMusic();
     };
 
+    const clearActivePointer = (pointer) => {
+      if (!pointer || activePointerId === pointer.id) {
+        activePointerId = null;
+      }
+    };
+
+    const handlePointerMove = (pointer) => {
+      if (activePointerId !== pointer.id || !pointer.isDown) {
+        return;
+      }
+
+      updateFromPointer(pointer);
+    };
+
     knob.on('drag', (pointer) => updateFromPointer(pointer));
     knob.on('pointerover', () => knobGlow.setFillStyle(0xf59e0b, 0.18));
     knob.on('pointerout', () => knobGlow.setFillStyle(0xf59e0b, 0.12));
-    trackHit.on('pointerdown', (pointer) => updateFromPointer(pointer));
+    knob.on('pointerdown', (pointer) => {
+      activePointerId = pointer.id;
+      updateFromPointer(pointer);
+    });
+    knob.on('pointerup', clearActivePointer);
+    knob.on('pointercancel', clearActivePointer);
+    trackHit.on('pointerdown', (pointer) => {
+      activePointerId = pointer.id;
+      updateFromPointer(pointer);
+    });
+    trackHit.on('pointermove', handlePointerMove);
+    trackHit.on('pointerup', clearActivePointer);
+    trackHit.on('pointerout', clearActivePointer);
+    this.input.on('pointermove', handlePointerMove);
+    this.input.on('pointerup', clearActivePointer);
+    this.input.on('gameout', () => {
+      activePointerId = null;
+    });
 
     container.add([trackGlow, trackHit, track, fill, knobGlow, knob]);
 
