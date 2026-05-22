@@ -685,12 +685,6 @@ export class TitleScene extends Phaser.Scene {
       return;
     }
 
-    if (audioManager.enableMusicFromUserGesture()) {
-      this.requestAudioUnlockAndStart();
-    } else {
-      this.refreshMusicUi();
-    }
-
     this.beginQuest();
   }
 
@@ -823,6 +817,13 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.menuStarted = true;
+
+    if (audioManager.enableMusicFromUserGesture()) {
+      this.requestAudioUnlockAndStart();
+    } else {
+      this.refreshMusicUi();
+    }
+
     playSfx(this, SFX_KEYS.MENU_CONFIRM, { volume: 0.22 });
     eventBridge.emit('title:begin');
   }
