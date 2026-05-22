@@ -414,7 +414,7 @@ export class TitleScene extends Phaser.Scene {
     this.audioToggleLabel = hudLabel;
 
     this.audioPanel = this.createAudioPanel(panelX, panelY);
-  this.audioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, layout.width, layout.height + 6);
+    this.audioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, layout.width, layout.height + 6);
     this.audioPanel.setVisible(false).setAlpha(0).setScale(0.94);
     this.installPanelOutsideClickHandler();
 
@@ -439,7 +439,17 @@ export class TitleScene extends Phaser.Scene {
   }
 
   getTitleAudioPanelLayout() {
-    const useLargeTouchLayout = this.sys.game.device.input.touch && !this.sys.game.device.os.desktop;
+    const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+    const primaryCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const anyCoarse = window.matchMedia('(any-pointer: coarse)').matches;
+    const noHover = window.matchMedia('(hover: none)').matches;
+    const touchCapable = maxTouchPoints > 0 || primaryCoarse || anyCoarse;
+    const shortestSide = Math.min(this.scale.width, this.scale.height);
+    const longestSide = Math.max(this.scale.width, this.scale.height);
+    const phoneViewport = shortestSide <= 760 && longestSide <= 980;
+    const tabletViewport = shortestSide <= 1024 && longestSide <= 1366;
+    const likelyTablet = touchCapable && tabletViewport && (primaryCoarse || anyCoarse || noHover || maxTouchPoints > 1);
+    const useLargeTouchLayout = touchCapable && (phoneViewport || likelyTablet);
 
     if (useLargeTouchLayout) {
       const modalWidth = Math.max(260, this.scale.width - 24);
@@ -514,8 +524,10 @@ export class TitleScene extends Phaser.Scene {
     const panel = this.add.container(x, y).setDepth(26);
     const shellX = layout.panelX;
     const shellY = layout.panelY;
-    const shellCenterX = shellX + (layout.innerWidth * 0.5);
-    const shellCenterY = shellY + (layout.innerHeight * 0.5);
+    const shellWidth = layout.isModal ? layout.innerWidth : layout.width;
+    const shellHeight = layout.isModal ? layout.innerHeight : layout.height;
+    const shellCenterX = shellX + (shellWidth * 0.5);
+    const shellCenterY = shellY + (shellHeight * 0.5);
 
     if (layout.isModal) {
       const backdrop = this.add.rectangle(0, 0, layout.width, layout.height, 0x020307, 0.88)
@@ -526,40 +538,59 @@ export class TitleScene extends Phaser.Scene {
       this.audioPanelBackdrop = backdrop;
     }
 
-    const shell = this.add.rectangle(shellX, shellY, layout.innerWidth, layout.innerHeight, 0x0b0a0f, 0.94)
+    const shell = this.add.rectangle(shellX, shellY, shellWidth, shellHeight, 0x0b0a0f, 0.94)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0xf3d38b, 0.34);
-    const inner = this.add.rectangle(shellCenterX, shellCenterY, layout.innerWidth - 20, layout.innerHeight - 22, 0x121117, 0.72)
+    const inner = this.add.rectangle(
+      shellCenterX,
+      shellCenterY,
+      layout.isModal ? layout.innerWidth - 20 : layout.innerWidth,
+      layout.isModal ? layout.innerHeight - 22 : layout.innerHeight,
+      0x121117,
+      0.72,
+    )
       .setStrokeStyle(1, 0xfff0c8, 0.06);
-    const glow = this.add.rectangle(shellCenterX, shellY + 18, Math.min(240, layout.innerWidth - 76), 18, 0xf59e0b, 0.06);
-    const title = this.add.text(shellX + 18, shellY + 16, 'Audio', {
+    const glow = this.add.rectangle(
+      layout.isModal ? shellCenterX : 104,
+      layout.isModal ? shellY + 18 : 18,
+      layout.isModal ? Math.min(240, layout.innerWidth - 76) : 132,
+      18,
+      0xf59e0b,
+      0.06,
+    );
+    const title = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + 16 : 16, 'Audio', {
       fontFamily: 'Georgia, Times New Roman, serif',
       fontSize: layout.titleFontSize,
       fontStyle: 'bold',
       color: '#f5ddb0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
-    const statusText = this.add.text(shellX + layout.innerWidth - 58, shellY + 16, 'Muted', {
+    const statusText = this.add.text(layout.isModal ? shellX + layout.innerWidth - 58 : 190, layout.isModal ? shellY + 16 : 16, 'Muted', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.statusFontSize,
       fontStyle: 'bold',
       color: '#d6b98f',
     }).setOrigin(1, 0.5);
 
-    const closeButton = this.add.circle(shellX + layout.innerWidth - 26, shellY + layout.closeY, layout.closeRadius, 0x17161d, 0.96)
-      .setStrokeStyle(1, 0xf3d38b, 0.34)
-      .setInteractive({ useHandCursor: true });
-    const closeLabel = this.add.text(shellX + layout.innerWidth - 26, shellY + layout.closeY - 0.5, 'X', {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: layout.labelFontSize,
-      fontStyle: 'bold',
-      color: '#f7e4b1',
-    }).setOrigin(0.5);
+    let closeButton = null;
+    let closeLabel = null;
 
-    const soundToggle = this.add.rectangle(shellCenterX, shellY + 66, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
+    if (layout.isModal) {
+      closeButton = this.add.circle(shellX + layout.innerWidth - 26, shellY + layout.closeY, layout.closeRadius, 0x17161d, 0.96)
+        .setStrokeStyle(1, 0xf3d38b, 0.34)
+        .setInteractive({ useHandCursor: true });
+      closeLabel = this.add.text(shellX + layout.innerWidth - 26, shellY + layout.closeY - 0.5, 'X', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: layout.labelFontSize,
+        fontStyle: 'bold',
+        color: '#f7e4b1',
+      }).setOrigin(0.5);
+    }
+
+    const soundToggle = this.add.rectangle(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + 66 : 43, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
       .setStrokeStyle(1, 0xf3d38b, 0.38)
       .setInteractive({ useHandCursor: true });
-    const soundToggleLabel = this.add.text(shellCenterX, shellY + 66, 'AUDIO OFF', {
+    const soundToggleLabel = this.add.text(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + 66 : 43, 'AUDIO OFF', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.toggleFontSize,
       fontStyle: 'bold',
@@ -573,16 +604,19 @@ export class TitleScene extends Phaser.Scene {
     });
     soundToggle.on('pointerout', () => soundToggle.setFillStyle(0x17161d, 0.96));
     soundToggle.on('pointerdown', () => this.toggleTitleMusic());
-    closeButton.on('pointerdown', () => this.hideAudioPanel());
 
-    const musicLabel = this.add.text(shellX + 18, shellY + layout.musicY, 'MUSIC', {
+    if (closeButton) {
+      closeButton.on('pointerdown', () => this.hideAudioPanel());
+    }
+
+    const musicLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.musicY : layout.musicY, 'MUSIC', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#d7c2a0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
-    const sfxLabel = this.add.text(shellX + 18, shellY + layout.sfxY, 'SFX', {
+    const sfxLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.sfxY : layout.sfxY, 'SFX', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
@@ -590,8 +624,8 @@ export class TitleScene extends Phaser.Scene {
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
 
-    this.musicSlider = this.createVolumeSlider(shellX + layout.sliderStartX, shellY + layout.musicY, 'music', layout.sliderWidth);
-    this.sfxSlider = this.createVolumeSlider(shellX + layout.sliderStartX, shellY + layout.sfxY, 'sfx', layout.sliderWidth);
+    this.musicSlider = this.createVolumeSlider(layout.isModal ? shellX + layout.sliderStartX : layout.sliderStartX, layout.isModal ? shellY + layout.musicY : layout.musicY, 'music', layout.sliderWidth);
+    this.sfxSlider = this.createVolumeSlider(layout.isModal ? shellX + layout.sliderStartX : layout.sliderStartX, layout.isModal ? shellY + layout.sfxY : layout.sfxY, 'sfx', layout.sliderWidth);
 
     panel.add([
       shell,
@@ -599,8 +633,6 @@ export class TitleScene extends Phaser.Scene {
       glow,
       title,
       statusText,
-      closeButton,
-      closeLabel,
       soundToggle,
       soundToggleLabel,
       musicLabel,
@@ -608,6 +640,10 @@ export class TitleScene extends Phaser.Scene {
       this.musicSlider.container,
       this.sfxSlider.container,
     ]);
+
+    if (closeButton && closeLabel) {
+      panel.add([closeButton, closeLabel]);
+    }
 
     this.audioToggleInlineStatus = statusText;
     this.audioToggleInlineLabel = soundToggleLabel;
