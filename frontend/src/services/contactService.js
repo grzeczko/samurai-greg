@@ -21,16 +21,18 @@ export async function sendContactMessage(formData) {
     });
   }
 
-  if (!response.ok || payload?.success === false) {
-    const error = new Error(payload?.message || 'Unable to send your message right now.');
+  const isValidJsonSuccess = payload && typeof payload === 'object' && payload.success === true;
+
+  if (!response.ok || payload?.success === false || !isValidJsonSuccess) {
+    const error = new Error(
+      payload?.message
+      || 'The contact service returned an unexpected response. Please try again in a moment.'
+    );
     error.status = response.status;
     error.errors = payload?.errors || {};
 
     throw error;
   }
 
-  return payload || {
-    success: true,
-    message: 'Thanks, your message has been sent.',
-  };
+  return payload;
 }
