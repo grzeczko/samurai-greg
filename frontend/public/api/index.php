@@ -2,10 +2,22 @@
 
 declare(strict_types=1);
 
-$backendPublicIndex = dirname(__DIR__, 3).'/backend/public/index.php';
 $publicRoot = dirname(__DIR__);
+$candidateBackendIndexes = [
+    dirname(__DIR__, 2).'/backend/public/index.php',
+    dirname(__DIR__, 3).'/backend/public/index.php',
+];
 
-if (!is_file($backendPublicIndex)) {
+$backendPublicIndex = null;
+
+foreach ($candidateBackendIndexes as $candidateBackendIndex) {
+    if (is_file($candidateBackendIndex)) {
+        $backendPublicIndex = $candidateBackendIndex;
+        break;
+    }
+}
+
+if ($backendPublicIndex === null) {
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([
