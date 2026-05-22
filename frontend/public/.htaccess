@@ -3,7 +3,8 @@
     RewriteEngine On
 
     # Send clean API requests through a local PHP bridge inside public_html.
-    RewriteRule ^api(/.*)?$ api/index.php [L,QSA]
+    RewriteRule ^api/?$ api/index.php?__api_path= [L,QSA]
+    RewriteRule ^api/(.*)$ api/index.php?__api_path=/$1 [L,QSA]
 
     # Serve existing Vite assets and public files directly.
     RewriteCond %{REQUEST_FILENAME} -f [OR]

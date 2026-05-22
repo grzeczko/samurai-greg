@@ -27,15 +27,27 @@ if ($backendPublicIndex === null) {
     exit;
 }
 
-$originalRequestUri = $_SERVER['REQUEST_URI'] ?? '/api';
+$apiPath = (string) ($_GET['__api_path'] ?? '');
 $originalQueryString = $_SERVER['QUERY_STRING'] ?? '';
+
+parse_str($originalQueryString, $queryParameters);
+unset($queryParameters['__api_path']);
+
+$rebuiltQueryString = http_build_query($queryParameters);
+$originalRequestUri = '/api'.$apiPath;
+
+if ($rebuiltQueryString !== '') {
+    $originalRequestUri .= '?'.$rebuiltQueryString;
+}
 
 $_SERVER['SCRIPT_FILENAME'] = $backendPublicIndex;
 $_SERVER['SCRIPT_NAME'] = '/api/index.php';
 $_SERVER['PHP_SELF'] = '/api/index.php';
 $_SERVER['DOCUMENT_ROOT'] = $publicRoot;
 $_SERVER['REQUEST_URI'] = $originalRequestUri;
-$_SERVER['QUERY_STRING'] = $originalQueryString;
+$_SERVER['QUERY_STRING'] = $rebuiltQueryString;
+
+unset($_GET['__api_path']);
 
 chdir(dirname($backendPublicIndex));
 
