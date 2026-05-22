@@ -41,9 +41,9 @@ if ($rebuiltQueryString !== '') {
 }
 
 $_SERVER['SCRIPT_FILENAME'] = $backendPublicIndex;
-$_SERVER['SCRIPT_NAME'] = '/api/index.php';
-$_SERVER['PHP_SELF'] = '/api/index.php';
-$_SERVER['DOCUMENT_ROOT'] = $publicRoot;
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+$_SERVER['DOCUMENT_ROOT'] = dirname($backendPublicIndex);
 $_SERVER['REQUEST_URI'] = $originalRequestUri;
 $_SERVER['QUERY_STRING'] = $rebuiltQueryString;
 
