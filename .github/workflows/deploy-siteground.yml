@@ -199,7 +199,7 @@ jobs:
           php artisan cache:clear
           php artisan route:clear
           php artisan view:clear
-          php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\\Contracts\\Console\\Kernel::class); $kernel->bootstrap(); echo "Laravel mail config: host=".config("mail.mailers.smtp.host").PHP_EOL; echo "Laravel mail config: port=".config("mail.mailers.smtp.port").PHP_EOL; echo "Laravel mail config: encryption=".config("mail.mailers.smtp.scheme").PHP_EOL;'
+          php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); echo "Laravel mail config: host=".config("mail.mailers.smtp.host").PHP_EOL; echo "Laravel mail config: port=".config("mail.mailers.smtp.port").PHP_EOL; echo "Laravel mail config: encryption=".config("mail.mailers.smtp.scheme").PHP_EOL;'
 
           php artisan migrate --force
           php artisan config:cache
