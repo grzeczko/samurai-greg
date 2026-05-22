@@ -18,9 +18,6 @@ function TouchButton({ action, ariaLabel, className = '', children }) {
 
     if (isDown) {
       eventBridge.emit('ui:press-start');
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    } else {
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
     }
 
     gameControls.setTouchAction(action, isDown);
@@ -33,6 +30,7 @@ function TouchButton({ action, ariaLabel, className = '', children }) {
       aria-label={ariaLabel}
       onPointerDown={(event) => setPressed(event, true)}
       onPointerUp={(event) => setPressed(event, false)}
+      onPointerLeave={(event) => setPressed(event, false)}
       onPointerCancel={(event) => setPressed(event, false)}
       onLostPointerCapture={() => gameControls.setTouchAction(action, false)}
     >
@@ -43,11 +41,24 @@ function TouchButton({ action, ariaLabel, className = '', children }) {
 
 export default function MobileTouchControls({ visible }) {
   useEffect(() => {
+    const resetTouchControls = () => gameControls.resetTouch();
+
     if (!visible) {
-      gameControls.resetTouch();
+      resetTouchControls();
     }
 
-    return () => gameControls.resetTouch();
+    window.addEventListener('pointerup', resetTouchControls);
+    window.addEventListener('pointercancel', resetTouchControls);
+    window.addEventListener('blur', resetTouchControls);
+    document.addEventListener('visibilitychange', resetTouchControls);
+
+    return () => {
+      window.removeEventListener('pointerup', resetTouchControls);
+      window.removeEventListener('pointercancel', resetTouchControls);
+      window.removeEventListener('blur', resetTouchControls);
+      document.removeEventListener('visibilitychange', resetTouchControls);
+      resetTouchControls();
+    };
   }, [visible]);
 
   if (!visible) {

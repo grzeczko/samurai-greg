@@ -1055,9 +1055,7 @@ export class Level1 extends Phaser.Scene {
     if (layout.isModal) {
       const backdrop = this.add.rectangle(0, 0, layout.width, layout.height, 0x020307, 0.88)
         .setOrigin(0, 0)
-        .setInteractive({ useHandCursor: true })
         .setScrollFactor(0);
-      backdrop.on('pointerdown', () => this.hideGameAudioPanel());
       panel.add(backdrop);
       this.gameAudioPanelBackdrop = backdrop;
     }
@@ -1228,14 +1226,23 @@ export class Level1 extends Phaser.Scene {
   createHudSlider(x, y, type, width = 92) {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
+    const touchOptimized = width > 120;
+    const trackGlowHeight = touchOptimized ? 20 : 10;
+    const trackHeight = touchOptimized ? 8 : 3;
+    const knobGlowRadius = touchOptimized ? 13 : 7;
+    const knobRadius = touchOptimized ? 9 : 4.5;
+    const hitAreaHeight = touchOptimized ? 34 : 14;
 
     const container = this.add.container(x, y).setScrollFactor(0);
-    const trackGlow = this.add.rectangle(width * 0.5, 0, width + 6, 10, 0xf59e0b, 0.04)
+    const trackGlow = this.add.rectangle(width * 0.5, 0, width + 6, trackGlowHeight, 0xf59e0b, 0.04)
       .setScrollFactor(0);
-    const track = this.add.rectangle(0, 0, width, 3, 0x332a22, 1).setOrigin(0, 0.5).setScrollFactor(0);
-    const fill = this.add.rectangle(0, 0, width * value, 3, 0xe9c27a, 1).setOrigin(0, 0.5).setScrollFactor(0);
-    const knobGlow = this.add.circle(width * value, 0, 7, 0xf59e0b, 0.12).setScrollFactor(0);
-    const knob = this.add.circle(width * value, 0, 4.5, 0xfff2cf, 1)
+    const trackHit = this.add.rectangle(width * 0.5, 0, width, hitAreaHeight, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: true })
+      .setScrollFactor(0);
+    const track = this.add.rectangle(0, 0, width, trackHeight, 0x332a22, 1).setOrigin(0, 0.5).setScrollFactor(0);
+    const fill = this.add.rectangle(0, 0, width * value, trackHeight, 0xe9c27a, 1).setOrigin(0, 0.5).setScrollFactor(0);
+    const knobGlow = this.add.circle(width * value, 0, knobGlowRadius, 0xf59e0b, 0.12).setScrollFactor(0);
+    const knob = this.add.circle(width * value, 0, knobRadius, 0xfff2cf, 1)
       .setStrokeStyle(1, 0x6b4d1d, 0.95)
       .setInteractive({ draggable: true, useHandCursor: true })
       .setScrollFactor(0);
@@ -1260,11 +1267,11 @@ export class Level1 extends Phaser.Scene {
     knob.on('drag', (pointer) => updateFromPointer(pointer));
     knob.on('pointerover', () => knobGlow.setFillStyle(0xf59e0b, 0.18));
     knob.on('pointerout', () => knobGlow.setFillStyle(0xf59e0b, 0.12));
-    track.setInteractive({ useHandCursor: true }).on('pointerdown', (pointer) => updateFromPointer(pointer));
+    trackHit.on('pointerdown', (pointer) => updateFromPointer(pointer));
 
-    container.add([trackGlow, track, fill, knobGlow, knob]);
+    container.add([trackGlow, trackHit, track, fill, knobGlow, knob]);
 
-    return { container, track, fill, knob, knobGlow, width };
+    return { container, track: trackHit, fill, knob, knobGlow, width };
   }
 
   toggleGameAudioPanel() {
