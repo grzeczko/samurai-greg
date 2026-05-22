@@ -375,9 +375,10 @@ export class TitleScene extends Phaser.Scene {
   }
 
   createAudioHud(width) {
+    const layout = this.getTitleAudioPanelLayout();
     const anchorX = width - 54;
     const anchorY = 52;
-    const panelX = anchorX - 208;
+    const panelX = Phaser.Math.Clamp(anchorX - layout.width, 8, this.scale.width - layout.width - 8);
     const panelY = anchorY + 70;
 
     const hudGlow = this.add.circle(anchorX, anchorY, 27, 0xf59e0b, 0.08)
@@ -413,7 +414,7 @@ export class TitleScene extends Phaser.Scene {
     this.audioToggleLabel = hudLabel;
 
     this.audioPanel = this.createAudioPanel(panelX, panelY);
-    this.audioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, 208, 126);
+  this.audioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, layout.width, layout.height + 6);
     this.audioPanel.setVisible(false).setAlpha(0).setScale(0.94);
     this.installPanelOutsideClickHandler();
 
@@ -437,35 +438,90 @@ export class TitleScene extends Phaser.Scene {
     this.refreshMusicUi();
   }
 
+  getTitleAudioPanelLayout() {
+    const useLargeTouchLayout = this.sys.game.device.input.touch && this.scale.width <= 1024;
+
+    if (useLargeTouchLayout) {
+      return {
+        width: 296,
+        height: 182,
+        innerWidth: 276,
+        innerHeight: 160,
+        titleFontSize: '16px',
+        statusFontSize: '13px',
+        toggleWidth: 244,
+        toggleHeight: 40,
+        toggleFontSize: '15px',
+        labelFontSize: '13px',
+        sliderWidth: 154,
+        sliderStartX: 118,
+        musicY: 104,
+        sfxY: 140,
+        closeX: 268,
+        closeY: 18,
+      };
+    }
+
+    return {
+      width: 208,
+      height: 126,
+      innerWidth: 192,
+      innerHeight: 110,
+      titleFontSize: '13px',
+      statusFontSize: '10px',
+      toggleWidth: 168,
+      toggleHeight: 28,
+      toggleFontSize: '11px',
+      labelFontSize: '10px',
+      sliderWidth: 92,
+      sliderStartX: 90,
+      musicY: 74,
+      sfxY: 98,
+      closeX: 184,
+      closeY: 16,
+    };
+  }
+
   createAudioPanel(x, y) {
+    const layout = this.getTitleAudioPanelLayout();
     const panel = this.add.container(x, y).setDepth(26);
 
-    const shell = this.add.rectangle(0, 0, 208, 126, 0x0b0a0f, 0.94)
+    const shell = this.add.rectangle(0, 0, layout.width, layout.height, 0x0b0a0f, 0.94)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0xf3d38b, 0.34);
-    const inner = this.add.rectangle(104, 63, 192, 110, 0x121117, 0.72)
+    const inner = this.add.rectangle(layout.width * 0.5, layout.height * 0.5, layout.innerWidth, layout.innerHeight, 0x121117, 0.72)
       .setStrokeStyle(1, 0xfff0c8, 0.06);
-    const glow = this.add.rectangle(104, 18, 132, 18, 0xf59e0b, 0.06);
+    const glow = this.add.rectangle(layout.width * 0.5, 18, Math.min(184, layout.width - 76), 18, 0xf59e0b, 0.06);
     const title = this.add.text(18, 16, 'Audio', {
       fontFamily: 'Georgia, Times New Roman, serif',
-      fontSize: '13px',
+      fontSize: layout.titleFontSize,
       fontStyle: 'bold',
       color: '#f5ddb0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
-    const statusText = this.add.text(190, 16, 'Muted', {
+    const statusText = this.add.text(layout.width - 48, 16, 'Muted', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '10px',
+      fontSize: layout.statusFontSize,
       fontStyle: 'bold',
       color: '#d6b98f',
     }).setOrigin(1, 0.5);
 
-    const soundToggle = this.add.rectangle(104, 43, 168, 28, 0x17161d, 0.96)
+    const closeButton = this.add.circle(layout.closeX, layout.closeY, layout.toggleHeight * 0.34, 0x17161d, 0.96)
+      .setStrokeStyle(1, 0xf3d38b, 0.34)
+      .setInteractive({ useHandCursor: true });
+    const closeLabel = this.add.text(layout.closeX, layout.closeY - 0.5, 'X', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: layout.labelFontSize,
+      fontStyle: 'bold',
+      color: '#f7e4b1',
+    }).setOrigin(0.5);
+
+    const soundToggle = this.add.rectangle(layout.width * 0.5, 52, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
       .setStrokeStyle(1, 0xf3d38b, 0.38)
       .setInteractive({ useHandCursor: true });
-    const soundToggleLabel = this.add.text(104, 43, 'AUDIO OFF', {
+    const soundToggleLabel = this.add.text(layout.width * 0.5, 52, 'AUDIO OFF', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '11px',
+      fontSize: layout.toggleFontSize,
       fontStyle: 'bold',
       color: '#f7d6dc',
       letterSpacing: 0.7,
@@ -477,24 +533,25 @@ export class TitleScene extends Phaser.Scene {
     });
     soundToggle.on('pointerout', () => soundToggle.setFillStyle(0x17161d, 0.96));
     soundToggle.on('pointerdown', () => this.toggleTitleMusic());
+    closeButton.on('pointerdown', () => this.hideAudioPanel());
 
-    const musicLabel = this.add.text(18, 74, 'MUSIC', {
+    const musicLabel = this.add.text(18, layout.musicY, 'MUSIC', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '10px',
+      fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#d7c2a0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
-    const sfxLabel = this.add.text(18, 98, 'SFX', {
+    const sfxLabel = this.add.text(18, layout.sfxY, 'SFX', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '10px',
+      fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#d7c2a0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5);
 
-    this.musicSlider = this.createVolumeSlider(90, 74, 'music');
-    this.sfxSlider = this.createVolumeSlider(90, 98, 'sfx');
+    this.musicSlider = this.createVolumeSlider(layout.sliderStartX, layout.musicY, 'music', layout.sliderWidth);
+    this.sfxSlider = this.createVolumeSlider(layout.sliderStartX, layout.sfxY, 'sfx', layout.sliderWidth);
 
     panel.add([
       shell,
@@ -502,6 +559,8 @@ export class TitleScene extends Phaser.Scene {
       glow,
       title,
       statusText,
+      closeButton,
+      closeLabel,
       soundToggle,
       soundToggleLabel,
       musicLabel,
@@ -551,10 +610,9 @@ export class TitleScene extends Phaser.Scene {
     });
   }
 
-  createVolumeSlider(x, y, type) {
+  createVolumeSlider(x, y, type, width = 92) {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
-    const width = 92;
 
     const container = this.add.container(x, y);
     const trackGlow = this.add.rectangle(width * 0.5, 0, width + 6, 10, 0xf59e0b, 0.04);
