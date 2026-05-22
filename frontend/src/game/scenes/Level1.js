@@ -896,31 +896,40 @@ export class Level1 extends Phaser.Scene {
     const useLargeTouchLayout = this.sys.game.device.input.touch && this.scale.width <= 1024;
 
     if (useLargeTouchLayout) {
+      const modalWidth = Math.max(260, this.scale.width - 24);
+      const modalHeight = Math.max(220, this.scale.height - 24);
+
       return {
-        width: 296,
-        height: 182,
-        innerWidth: 276,
-        innerHeight: 160,
-        titleFontSize: '16px',
-        statusFontSize: '13px',
-        toggleWidth: 244,
-        toggleHeight: 40,
-        toggleFontSize: '15px',
-        labelFontSize: '13px',
-        sliderWidth: 154,
+        isModal: true,
+        width: this.scale.width,
+        height: this.scale.height,
+        innerWidth: modalWidth,
+        innerHeight: modalHeight,
+        panelX: (this.scale.width - modalWidth) / 2,
+        panelY: (this.scale.height - modalHeight) / 2,
+        titleFontSize: '22px',
+        statusFontSize: '15px',
+        toggleWidth: modalWidth - 44,
+        toggleHeight: 54,
+        toggleFontSize: '18px',
+        labelFontSize: '15px',
+        sliderWidth: modalWidth - 150,
         sliderStartX: 118,
-        musicY: 104,
-        sfxY: 140,
-        closeX: 268,
+        musicY: 122,
+        sfxY: 176,
+        closeRadius: 22,
         closeY: 18,
       };
     }
 
     return {
+      isModal: false,
       width: 208,
       height: 126,
       innerWidth: 192,
       innerHeight: 110,
+      panelX: 0,
+      panelY: 0,
       titleFontSize: '13px',
       statusFontSize: '10px',
       toggleWidth: 168,
@@ -931,7 +940,7 @@ export class Level1 extends Phaser.Scene {
       sliderStartX: 90,
       musicY: 74,
       sfxY: 98,
-      closeX: 184,
+      closeRadius: 10,
       closeY: 16,
     };
   }
@@ -1008,46 +1017,60 @@ export class Level1 extends Phaser.Scene {
   createGameAudioPanel(x, y) {
     const layout = this.getGameAudioPanelLayout();
     const panel = this.add.container(x, y).setDepth(1005).setScrollFactor(0);
+    const shellX = layout.panelX;
+    const shellY = layout.panelY;
+    const shellCenterX = shellX + (layout.innerWidth * 0.5);
+    const shellCenterY = shellY + (layout.innerHeight * 0.5);
 
-    const shell = this.add.rectangle(0, 0, layout.width, layout.height, 0x0b0a0f, 0.94)
+    if (layout.isModal) {
+      const backdrop = this.add.rectangle(0, 0, layout.width, layout.height, 0x020307, 0.88)
+        .setOrigin(0, 0)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0);
+      backdrop.on('pointerdown', () => this.hideGameAudioPanel());
+      panel.add(backdrop);
+      this.gameAudioPanelBackdrop = backdrop;
+    }
+
+    const shell = this.add.rectangle(shellX, shellY, layout.innerWidth, layout.innerHeight, 0x0b0a0f, 0.94)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0xf3d38b, 0.34)
       .setScrollFactor(0);
-    const inner = this.add.rectangle(layout.width * 0.5, layout.height * 0.5, layout.innerWidth, layout.innerHeight, 0x121117, 0.72)
+    const inner = this.add.rectangle(shellCenterX, shellCenterY, layout.innerWidth - 20, layout.innerHeight - 22, 0x121117, 0.72)
       .setStrokeStyle(1, 0xfff0c8, 0.06)
       .setScrollFactor(0);
-    const glow = this.add.rectangle(layout.width * 0.5, 18, Math.min(184, layout.width - 76), 18, 0xf59e0b, 0.06)
+    const glow = this.add.rectangle(shellCenterX, shellY + 18, Math.min(240, layout.innerWidth - 76), 18, 0xf59e0b, 0.06)
       .setScrollFactor(0);
-    const title = this.add.text(18, 16, 'Audio', {
+    const title = this.add.text(shellX + 18, shellY + 16, 'Audio', {
       fontFamily: 'Georgia, Times New Roman, serif',
       fontSize: layout.titleFontSize,
       fontStyle: 'bold',
       color: '#f5ddb0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5).setScrollFactor(0);
-    const statusText = this.add.text(layout.width - 48, 16, 'Muted', {
+    const statusText = this.add.text(shellX + layout.innerWidth - 58, shellY + 16, 'Muted', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.statusFontSize,
       fontStyle: 'bold',
       color: '#d6b98f',
     }).setOrigin(1, 0.5).setScrollFactor(0);
 
-    const closeButton = this.add.circle(layout.closeX, layout.closeY, layout.toggleHeight * 0.34, 0x17161d, 0.96)
+    const closeButton = this.add.circle(shellX + layout.innerWidth - 26, shellY + layout.closeY, layout.closeRadius, 0x17161d, 0.96)
       .setStrokeStyle(1, 0xf3d38b, 0.34)
       .setInteractive({ useHandCursor: true })
       .setScrollFactor(0);
-    const closeLabel = this.add.text(layout.closeX, layout.closeY - 0.5, 'X', {
+    const closeLabel = this.add.text(shellX + layout.innerWidth - 26, shellY + layout.closeY - 0.5, 'X', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#f7e4b1',
     }).setOrigin(0.5).setScrollFactor(0);
 
-    const soundToggle = this.add.rectangle(layout.width * 0.5, 52, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
+    const soundToggle = this.add.rectangle(shellCenterX, shellY + 66, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
       .setStrokeStyle(1, 0xf3d38b, 0.38)
       .setInteractive({ useHandCursor: true })
       .setScrollFactor(0);
-    const soundToggleLabel = this.add.text(layout.width * 0.5, 52, 'AUDIO OFF', {
+    const soundToggleLabel = this.add.text(shellCenterX, shellY + 66, 'AUDIO OFF', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.toggleFontSize,
       fontStyle: 'bold',
@@ -1063,14 +1086,14 @@ export class Level1 extends Phaser.Scene {
     soundToggle.on('pointerdown', () => this.toggleGameMusic());
     closeButton.on('pointerdown', () => this.hideGameAudioPanel());
 
-    const musicLabel = this.add.text(18, layout.musicY, 'MUSIC', {
+    const musicLabel = this.add.text(shellX + 18, shellY + layout.musicY, 'MUSIC', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#d7c2a0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5).setScrollFactor(0);
-    const sfxLabel = this.add.text(18, layout.sfxY, 'SFX', {
+    const sfxLabel = this.add.text(shellX + 18, shellY + layout.sfxY, 'SFX', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
@@ -1078,8 +1101,8 @@ export class Level1 extends Phaser.Scene {
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5).setScrollFactor(0);
 
-    this.gameMusicSlider = this.createHudSlider(layout.sliderStartX, layout.musicY, 'music', layout.sliderWidth);
-    this.gameSfxSlider = this.createHudSlider(layout.sliderStartX, layout.sfxY, 'sfx', layout.sliderWidth);
+    this.gameMusicSlider = this.createHudSlider(shellX + layout.sliderStartX, shellY + layout.musicY, 'music', layout.sliderWidth);
+    this.gameSfxSlider = this.createHudSlider(shellX + layout.sliderStartX, shellY + layout.sfxY, 'sfx', layout.sliderWidth);
 
     panel.add([
       shell,
@@ -1105,6 +1128,10 @@ export class Level1 extends Phaser.Scene {
   }
 
   installGamePanelOutsideClickHandler() {
+    if (this.getGameAudioPanelLayout().isModal) {
+      return;
+    }
+
     this.handleGamePanelOutsideClick = (pointer) => {
       if (!this.gameAudioPanel?.visible || !this.gameAudioPanelBounds) {
         return;
@@ -1134,7 +1161,10 @@ export class Level1 extends Phaser.Scene {
       scaleY: 0.96,
       duration: 170,
       ease: 'Sine.out',
-      onComplete: () => this.gameAudioPanel?.setVisible(false),
+      onComplete: () => {
+        this.gameAudioPanel?.setVisible(false);
+        this.gameAudioPanel?.setAlpha(0);
+      },
     });
   }
 
