@@ -61,7 +61,7 @@ cd backend
 php artisan key:generate --show
 ```
 
-The workflow uploads the Laravel env secret as a temporary seed file and creates `$SITE_ROOT/backend/.env` only when that file does not already exist. Existing server `.env` files are preserved.
+The workflow uploads the Laravel env secret as a temporary deploy payload and overwrites `$SITE_ROOT/backend/.env` on every deploy. The GitHub secret `LARAVEL_ENV_FILE` is the source of truth for the production Laravel environment.
 
 ## What The Workflow Does
 
@@ -74,10 +74,11 @@ The workflow uploads the Laravel env secret as a temporary seed file and creates
 5. Builds the frontend with `npm run build`.
 6. Adds `frontend/dist/.htaccess` for `/api` and React Router fallback handling.
 7. Sets up PHP 8.3 and Composer for validation.
-8. Writes `backend/.env` from `LARAVEL_ENV_FILE` in the runner.
+8. Writes a temporary backend env payload from `LARAVEL_ENV_FILE` in the runner.
 9. Uses rsync over SSH to deploy `frontend/dist/` to `$SITE_ROOT/public_html`.
 10. Uses rsync over SSH to deploy `backend/` to `$SITE_ROOT/backend`.
-11. SSHes into SiteGround and runs Composer, cache clears, migrations, and cache rebuilds.
+11. Uploads the temporary backend env payload to `$SITE_ROOT/.deploy/backend.env`.
+12. SSHes into SiteGround, overwrites `$SITE_ROOT/backend/.env`, verifies non-sensitive mail settings, runs Composer, clears Laravel caches, runs migrations, and rebuilds caches.
 
 ## Preserved Server Files
 
@@ -92,6 +93,8 @@ The backend rsync excludes these runtime paths:
 - `database/*.sqlite`
 
 This keeps the server environment file, uploaded files, logs, generated storage content, and Composer dependencies from being deleted by deploys. The workflow recreates required Laravel storage/cache directories if they are missing.
+
+Even though rsync excludes `.env`, the workflow writes the production Laravel `.env` over SSH after the backend files are copied, so secret changes are applied on every deploy without printing the file contents.
 
 The frontend rsync uses `--delete` so old hashed Vite assets are removed from `public_html`, while preserving `.well-known/` and `cgi-bin/`.
 

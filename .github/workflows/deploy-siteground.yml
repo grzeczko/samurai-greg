@@ -88,8 +88,9 @@ jobs:
           set -euo pipefail
           umask 077
           mkdir -p .deploy
-          printf '%s\n' "$LARAVEL_ENV_FILE" > backend/.env
-          cp backend/.env .deploy/backend.env
+          # LARAVEL_ENV_FILE is the source of truth for the production Laravel environment.
+          # Keep it in a temporary runner file only; the server copy is overwritten later over SSH.
+          printf '%s\n' "$LARAVEL_ENV_FILE" > .deploy/backend.env
 
       - name: Configure SSH
         env:
@@ -137,7 +138,7 @@ jobs:
             -e "ssh -i ~/.ssh/siteground_key -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
             backend/ "$SSH_USER@$SSH_HOST:$SITE_ROOT/backend/"
 
-      - name: Upload backend environment seed
+      - name: Upload backend environment payload
         run: |
           set -euo pipefail
           rsync -az \
@@ -153,14 +154,23 @@ jobs:
           BACKEND_PATH="$SITE_ROOT/backend"
           ENV_SOURCE="$SITE_ROOT/.deploy/backend.env"
 
-          if [ ! -f "$BACKEND_PATH/.env" ] && [ -s "$ENV_SOURCE" ]; then
-            cp "$ENV_SOURCE" "$BACKEND_PATH/.env"
-            chmod 600 "$BACKEND_PATH/.env"
+          # GitHub secret LARAVEL_ENV_FILE is the source of truth for production.
+          # Overwrite the server .env on every deploy and never print its contents.
+          if [ ! -s "$ENV_SOURCE" ]; then
+            echo "Missing Laravel environment payload" >&2
+            exit 1
           fi
+
+          cp "$ENV_SOURCE" "$BACKEND_PATH/.env"
+          chmod 600 "$BACKEND_PATH/.env"
 
           rm -f "$ENV_SOURCE"
 
           cd "$BACKEND_PATH"
+
+          test -f .env
+          grep -q '^MAIL_ENCRYPTION=tls$' .env && echo "Laravel .env updated: MAIL_ENCRYPTION=tls"
+          grep -q '^MAIL_PORT=587$' .env && echo "Laravel .env updated: MAIL_PORT=587"
 
           mkdir -p \
             database \
@@ -179,11 +189,19 @@ jobs:
           chmod -R u+rwX storage bootstrap/cache
 
           composer install --no-dev --optimize-autoloader
+
+          rm -f bootstrap/cache/config.php
+          rm -f bootstrap/cache/packages.php
+          rm -f bootstrap/cache/services.php
+
+          php artisan optimize:clear
           php artisan config:clear
-          php artisan migrate --force
           php artisan cache:clear
           php artisan route:clear
           php artisan view:clear
+          php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\\Contracts\\Console\\Kernel::class); $kernel->bootstrap(); echo "Laravel mail config: host=".config("mail.mailers.smtp.host").PHP_EOL; echo "Laravel mail config: port=".config("mail.mailers.smtp.port").PHP_EOL; echo "Laravel mail config: encryption=".config("mail.mailers.smtp.scheme").PHP_EOL;'
+
+          php artisan migrate --force
           php artisan config:cache
           php artisan route:cache
           php artisan view:cache
