@@ -410,17 +410,10 @@ export default function GameContainer() {
     };
 
     const handleBossDefeated = (payload = {}) => {
-      const run = normalizeCompletionRun(payload);
-
       void reportRunProgress('boss_defeated', {
         codexesCollected: Number(payload.codexes_collected ?? payload.codexesCollected ?? LEVEL_POWERUP_IDS.length),
         totalCodexes: Number(payload.total_codexes ?? payload.totalCodexes ?? LEVEL_POWERUP_IDS.length),
       });
-
-      if (run) {
-        setCompletionRun(run);
-        setRecordState(EMPTY_RECORD_STATE);
-      }
     };
 
     const handlePlayerDied = ({ death_count: deathCount, deathCount: fallbackDeathCount } = {}) => {
@@ -437,7 +430,8 @@ export default function GameContainer() {
       setCollectedPowerups(prev => (completedIds.length > 0 ? completedIds : prev));
       setCompletionPowerups(powerups);
       if (run) {
-        setCompletionRun(prev => prev ?? run);
+        setCompletionRun(run);
+        setRecordState(EMPTY_RECORD_STATE);
       }
       setGamePhase('complete');
     };
