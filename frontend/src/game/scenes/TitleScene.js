@@ -48,6 +48,7 @@ export class TitleScene extends Phaser.Scene {
     this.handlePanelOutsideClick = null;
     this.titleMusic = null;
     this.pendingMusicRetry = false;
+    this.waitingForAudioUnlock = false;
     this.handleUnlockRetry = null;
     this.handleUnlockRetryKey = null;
     this.levelStarting = false;
@@ -59,6 +60,8 @@ export class TitleScene extends Phaser.Scene {
 
   create() {
     createGameAnimations(this);
+    this.pendingMusicRetry = false;
+    this.waitingForAudioUnlock = false;
 
     const { width, height } = this.scale;
 
@@ -360,13 +363,13 @@ export class TitleScene extends Phaser.Scene {
   installUnlockRetryHandlers() {
     this.handleUnlockRetry = () => {
       if (this.pendingMusicRetry) {
-        this.tryStartTitleMusic();
+        this.requestAudioUnlockAndStart();
       }
     };
 
     this.handleUnlockRetryKey = () => {
       if (this.pendingMusicRetry) {
-        this.tryStartTitleMusic();
+        this.requestAudioUnlockAndStart();
       }
     };
 
@@ -378,8 +381,8 @@ export class TitleScene extends Phaser.Scene {
     const layout = this.getTitleAudioPanelLayout();
     const anchorX = width - 54;
     const anchorY = 52;
-    const panelX = Phaser.Math.Clamp(anchorX - layout.width, 8, this.scale.width - layout.width - 8);
-    const panelY = anchorY + 70;
+    const panelX = layout.isModal ? 0 : Phaser.Math.Clamp(anchorX - layout.width, 8, this.scale.width - layout.width - 8);
+    const panelY = layout.isModal ? 0 : anchorY + 70;
 
     const hudGlow = this.add.circle(anchorX, anchorY, 27, 0xf59e0b, 0.08)
       .setDepth(22);
@@ -408,6 +411,7 @@ export class TitleScene extends Phaser.Scene {
 
     hudBg.on('pointerdown', (pointer) => {
       pointer.event?.preventDefault?.();
+      pointer.event?.stopPropagation?.();
       this.toggleAudioPanel();
     });
 
@@ -417,7 +421,12 @@ export class TitleScene extends Phaser.Scene {
     this.audioToggleLabel = hudLabel;
 
     this.audioPanel = this.createAudioPanel(panelX, panelY);
-    this.audioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, layout.width, layout.height + 6);
+    this.audioPanelBounds = new Phaser.Geom.Rectangle(
+      panelX,
+      layout.isModal ? panelY : panelY - 6,
+      layout.width,
+      layout.isModal ? layout.height : layout.height + 6,
+    );
     this.audioPanel.setVisible(false).setAlpha(0).setScale(0.94);
     this.installPanelOutsideClickHandler();
 
@@ -604,10 +613,18 @@ export class TitleScene extends Phaser.Scene {
       playSfx(this, SFX_KEYS.MENU_HOVER, { volume: 0.05 });
     });
     soundToggle.on('pointerout', () => soundToggle.setFillStyle(0x17161d, 0.96));
-    soundToggle.on('pointerdown', () => this.toggleTitleMusic());
+    soundToggle.on('pointerdown', (pointer) => {
+      pointer.event?.preventDefault?.();
+      pointer.event?.stopPropagation?.();
+      this.toggleTitleMusic();
+    });
 
     if (closeButton) {
-      closeButton.on('pointerdown', () => this.hideAudioPanel());
+      closeButton.on('pointerdown', (pointer) => {
+        pointer.event?.preventDefault?.();
+        pointer.event?.stopPropagation?.();
+        this.hideAudioPanel();
+      });
     }
 
     const musicLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.musicY : layout.musicY, 'MUSIC', {
@@ -665,8 +682,10 @@ export class TitleScene extends Phaser.Scene {
         return;
       }
 
-      const overToggle = this.audioToggleBg?.getBounds()?.contains(pointer.worldX, pointer.worldY);
-      const insidePanel = Phaser.Geom.Rectangle.Contains(this.audioPanelBounds, pointer.worldX, pointer.worldY);
+      const pointerX = pointer.x;
+      const pointerY = pointer.y;
+      const overToggle = this.audioToggleBg?.getBounds()?.contains(pointerX, pointerY);
+      const insidePanel = Phaser.Geom.Rectangle.Contains(this.audioPanelBounds, pointerX, pointerY);
 
       if (!overToggle && !insidePanel) {
         this.hideAudioPanel();
@@ -782,6 +801,15 @@ export class TitleScene extends Phaser.Scene {
     }
 
     const show = !this.audioPanel.visible;
+
+    if (show) {
+      const settings = audioManager.getSettings();
+
+      if (settings.musicEnabled && !settings.muted && this.pendingMusicRetry) {
+        this.requestAudioUnlockAndStart();
+      }
+    }
+
     this.audioPanel.setVisible(true);
     this.setTitleAudioPanelInputEnabled(show);
     this.tweens.killTweensOf(this.audioPanel);
@@ -898,24 +926,32 @@ export class TitleScene extends Phaser.Scene {
       return;
     }
 
-    const maybeContext = this.sound.context;
+    this.pendingMusicRetry = true;
 
-    if (this.sound.locked && typeof this.sound.unlock === 'function') {
-      this.sound.unlock();
-    }
-
-    if (maybeContext?.state === 'suspended' && typeof maybeContext.resume === 'function') {
-      maybeContext.resume()
-        .catch(() => {
-          this.pendingMusicRetry = true;
-        })
-        .finally(() => {
-          this.tryStartTitleMusic();
-        });
+    if (this.waitingForAudioUnlock) {
+      this.refreshMusicUi();
       return;
     }
 
-    this.tryStartTitleMusic();
+    this.waitingForAudioUnlock = true;
+
+    audioManager.unlockSceneAudio(this)
+      .then((unlocked) => {
+        this.waitingForAudioUnlock = false;
+
+        if (!unlocked || this.sound?.locked) {
+          this.pendingMusicRetry = true;
+          this.refreshMusicUi();
+          return;
+        }
+
+        this.tryStartTitleMusic();
+      })
+      .catch(() => {
+        this.waitingForAudioUnlock = false;
+        this.pendingMusicRetry = true;
+        this.refreshMusicUi();
+      });
   }
 
   toggleTitleMusic() {
@@ -968,6 +1004,7 @@ export class TitleScene extends Phaser.Scene {
     }
 
     this.pendingMusicRetry = false;
+    this.waitingForAudioUnlock = false;
     this.audioHud = null;
     this.audioToggleBg = null;
     this.audioToggleLabel = null;

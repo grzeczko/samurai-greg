@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const MIN_AUDIBLE_VOLUME = 0.05;
+const PHASER_SOUND_UNLOCKED_EVENT = 'unlocked';
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 
@@ -259,6 +260,93 @@ class AudioManager {
       ...config,
       volume: finalVolume,
     });
+  }
+
+  waitForSceneAudioUnlock(scene, timeoutMs = 900) {
+    const sound = scene?.sound;
+
+    if (!sound || !sound.locked) {
+      return Promise.resolve(true);
+    }
+
+    if (typeof sound.once !== 'function') {
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let timeoutId = null;
+
+      const finish = (unlocked) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+
+        if (typeof sound.off === 'function') {
+          sound.off(PHASER_SOUND_UNLOCKED_EVENT, handleUnlock);
+        }
+
+        resolve(unlocked);
+      };
+
+      const handleUnlock = () => finish(true);
+
+      sound.once(PHASER_SOUND_UNLOCKED_EVENT, handleUnlock);
+      timeoutId = window.setTimeout(() => finish(!sound.locked), timeoutMs);
+    });
+  }
+
+  async unlockSceneAudio(scene) {
+    const sound = scene?.sound;
+
+    if (!sound) {
+      return false;
+    }
+
+    if (!sound.locked && sound.context?.state !== 'suspended' && sound.context?.state !== 'interrupted') {
+      return true;
+    }
+
+    if (sound.locked && typeof sound.unlock === 'function') {
+      try {
+        sound.unlock();
+      } catch {
+        // Browser unlock quirks vary; direct context resume below is the reliable mobile path.
+      }
+    }
+
+    const context = sound.context;
+    const shouldResumeContext = context
+      && typeof context.resume === 'function'
+      && (context.state === 'suspended' || context.state === 'interrupted');
+
+    if (shouldResumeContext) {
+      try {
+        await context.resume();
+
+        if (sound.locked && context.state === 'running') {
+          sound.unlocked = true;
+        }
+      } catch {
+        return this.waitForSceneAudioUnlock(scene, 450);
+      }
+    }
+
+    if (sound.locked && context?.state === 'running') {
+      sound.unlocked = true;
+    }
+
+    if (sound.locked) {
+      return this.waitForSceneAudioUnlock(scene);
+    }
+
+    return true;
   }
 
   ensureMusicTrack(scene, slot, key) {

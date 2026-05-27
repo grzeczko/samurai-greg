@@ -205,6 +205,8 @@ export class Level1 extends Phaser.Scene {
     this.isBossIntroPlaying = false;
     this.isBossDefeated = false;
     this.isBossResetting = false;
+    this.pendingGameMusicRetry = false;
+    this.waitingForGameAudioUnlock = false;
     this.currentCheckpoint = {
       id: 'start',
       x: PLAYER.START_X,
@@ -227,6 +229,7 @@ export class Level1 extends Phaser.Scene {
     this.pendingGameMusicRetry = false;
     this.handleGameUnlockRetry = null;
     this.handleGameUnlockRetryKey = null;
+    this.waitingForGameAudioUnlock = false;
     this.shouldAutoStart = false;
   }
 
@@ -853,8 +856,8 @@ export class Level1 extends Phaser.Scene {
     const layout = this.getGameAudioPanelLayout();
     const x = this.scale.width - 54;
     const y = 50;
-    const panelX = Phaser.Math.Clamp(x - layout.width, 8, this.scale.width - layout.width - 8);
-    const panelY = y + 70;
+    const panelX = layout.isModal ? 0 : Phaser.Math.Clamp(x - layout.width, 8, this.scale.width - layout.width - 8);
+    const panelY = layout.isModal ? 0 : y + 70;
     const buttonGlow = this.add.circle(x, y, 27, 0xf59e0b, 0.08)
       .setScrollFactor(0)
       .setDepth(1001);
@@ -884,6 +887,7 @@ export class Level1 extends Phaser.Scene {
 
     button.on('pointerdown', (pointer) => {
       pointer.event?.preventDefault?.();
+      pointer.event?.stopPropagation?.();
       this.toggleGameAudioPanel();
     });
 
@@ -891,7 +895,12 @@ export class Level1 extends Phaser.Scene {
     this.gameSoundButton = button;
     this.gameSoundButtonLabel = label;
     this.gameAudioPanel = this.createGameAudioPanel(panelX, panelY);
-    this.gameAudioPanelBounds = new Phaser.Geom.Rectangle(panelX, panelY - 6, layout.width, layout.height + 6);
+    this.gameAudioPanelBounds = new Phaser.Geom.Rectangle(
+      panelX,
+      layout.isModal ? panelY : panelY - 6,
+      layout.width,
+      layout.isModal ? layout.height : layout.height + 6,
+    );
     this.gameAudioPanel.setVisible(false).setAlpha(0).setScale(0.94);
     this.installGamePanelOutsideClickHandler();
     this.refreshGameSoundHud();
@@ -1135,10 +1144,18 @@ export class Level1 extends Phaser.Scene {
       playSfx(this, SFX_KEYS.MENU_HOVER, { volume: 0.05 });
     });
     soundToggle.on('pointerout', () => soundToggle.setFillStyle(0x17161d, 0.96));
-    soundToggle.on('pointerdown', () => this.toggleGameMusic());
+    soundToggle.on('pointerdown', (pointer) => {
+      pointer.event?.preventDefault?.();
+      pointer.event?.stopPropagation?.();
+      this.toggleGameMusic();
+    });
 
     if (closeButton) {
-      closeButton.on('pointerdown', () => this.hideGameAudioPanel());
+      closeButton.on('pointerdown', (pointer) => {
+        pointer.event?.preventDefault?.();
+        pointer.event?.stopPropagation?.();
+        this.hideGameAudioPanel();
+      });
     }
 
     const musicLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.musicY : layout.musicY, 'MUSIC', {
@@ -1196,8 +1213,10 @@ export class Level1 extends Phaser.Scene {
         return;
       }
 
-      const overToggle = this.gameSoundButton?.getBounds()?.contains(pointer.worldX, pointer.worldY);
-      const insidePanel = Phaser.Geom.Rectangle.Contains(this.gameAudioPanelBounds, pointer.worldX, pointer.worldY);
+      const pointerX = pointer.x;
+      const pointerY = pointer.y;
+      const overToggle = this.gameSoundButton?.getBounds()?.contains(pointerX, pointerY);
+      const insidePanel = Phaser.Geom.Rectangle.Contains(this.gameAudioPanelBounds, pointerX, pointerY);
 
       if (!overToggle && !insidePanel) {
         this.hideGameAudioPanel();
@@ -1219,9 +1238,11 @@ export class Level1 extends Phaser.Scene {
       this.gameAudioPanel.setVisible(false);
       this.gameAudioPanel.setAlpha(0);
       this.gameAudioPanel.setScale(0.94);
+      eventBridge.emit('game:audio-panel', { visible: false });
       return;
     }
 
+    eventBridge.emit('game:audio-panel', { visible: false });
     this.tweens.add({
       targets: this.gameAudioPanel,
       alpha: 0,
@@ -1325,7 +1346,17 @@ export class Level1 extends Phaser.Scene {
     }
 
     const show = !this.gameAudioPanel.visible;
+
+    if (show) {
+      const settings = audioManager.getSettings();
+
+      if (settings.musicEnabled && !settings.muted && this.pendingGameMusicRetry) {
+        this.requestGameAudioUnlockAndStart();
+      }
+    }
+
     this.gameAudioPanel.setVisible(true);
+    eventBridge.emit('game:audio-panel', { visible: show });
     this.setGameAudioPanelInputEnabled(show);
     this.tweens.killTweensOf(this.gameAudioPanel);
     this.tweens.add({
@@ -1496,24 +1527,32 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
-    const maybeContext = this.sound.context;
+    this.pendingGameMusicRetry = true;
 
-    if (this.sound.locked && typeof this.sound.unlock === 'function') {
-      this.sound.unlock();
-    }
-
-    if (maybeContext?.state === 'suspended' && typeof maybeContext.resume === 'function') {
-      maybeContext.resume()
-        .catch(() => {
-          this.pendingGameMusicRetry = true;
-        })
-        .finally(() => {
-          this.startGameMusic();
-        });
+    if (this.waitingForGameAudioUnlock) {
+      this.refreshGameSoundHud();
       return;
     }
 
-    this.startGameMusic();
+    this.waitingForGameAudioUnlock = true;
+
+    audioManager.unlockSceneAudio(this)
+      .then((unlocked) => {
+        this.waitingForGameAudioUnlock = false;
+
+        if (!unlocked || this.sound?.locked) {
+          this.pendingGameMusicRetry = true;
+          this.refreshGameSoundHud();
+          return;
+        }
+
+        this.startGameMusic();
+      })
+      .catch(() => {
+        this.waitingForGameAudioUnlock = false;
+        this.pendingGameMusicRetry = true;
+        this.refreshGameSoundHud();
+      });
   }
 
   cleanupLevelAudio() {
@@ -1542,6 +1581,8 @@ export class Level1 extends Phaser.Scene {
     this.gameSoundInlineLabel = null;
     this.gameAudioPanelBounds = null;
     this.pendingGameMusicRetry = false;
+    this.waitingForGameAudioUnlock = false;
+    eventBridge.emit('game:audio-panel', { visible: false });
 
     if (this.handleGamePanelOutsideClick) {
       this.input.off('pointerdown', this.handleGamePanelOutsideClick, this);

@@ -9,6 +9,16 @@ function getViewportSize() {
   };
 }
 
+function updateGameViewportCssVars() {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const { width, height } = getViewportSize();
+  document.documentElement.style.setProperty('--game-visible-width', `${width}px`);
+  document.documentElement.style.setProperty('--game-visible-height', `${height}px`);
+}
+
 function getMobileGameDeviceState() {
   if (typeof window === 'undefined') {
     return {
@@ -47,6 +57,7 @@ export function useMobileGameDevice() {
     ];
 
     const updateDeviceState = () => {
+      updateGameViewportCssVars();
       setDeviceState(getMobileGameDeviceState());
     };
 
@@ -72,6 +83,9 @@ export function useMobileGameDevice() {
         query.removeEventListener?.('change', updateDeviceState);
         query.removeListener?.(updateDeviceState);
       });
+
+      document.documentElement.style.removeProperty('--game-visible-width');
+      document.documentElement.style.removeProperty('--game-visible-height');
     };
   }, []);
 

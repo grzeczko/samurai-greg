@@ -123,6 +123,7 @@ export default function GameContainer() {
   const landscapeRef = useRef(true);
   const [gamePhase, setGamePhase] = useState('title');
   const [gameBootError, setGameBootError] = useState(null);
+  const [isGameAudioPanelOpen, setIsGameAudioPanelOpen] = useState(false);
   const [currentPowerup, setCurrentPowerup] = useState(null);
   const [collectedPowerups, setCollectedPowerups] = useState([]);
   const [completionPowerups, setCompletionPowerups] = useState([]);
@@ -202,9 +203,14 @@ export default function GameContainer() {
     const handleQuestComplete = ({ powerups = [] } = {}) => {
       const completedIds = powerups.map(powerup => powerup.id);
       setCurrentPowerup(null);
+      setIsGameAudioPanelOpen(false);
       setCollectedPowerups(prev => (completedIds.length > 0 ? completedIds : prev));
       setCompletionPowerups(powerups);
       setGamePhase('complete');
+    };
+
+    const handleGameAudioPanel = ({ visible = false } = {}) => {
+      setIsGameAudioPanelOpen(Boolean(visible));
     };
 
     const handleTitleBegin = () => {
@@ -229,6 +235,9 @@ export default function GameContainer() {
     eventBridge.on('game:ready', handleGameReady);
     eventBridge.on('quest:portal-open', handlePortalOpen);
     eventBridge.on('quest:complete', handleQuestComplete);
+    eventBridge.on('game:audio-panel', handleGameAudioPanel);
+
+    let bootErrorFrame = null;
 
     try {
       const game = new Phaser.Game({
@@ -237,19 +246,26 @@ export default function GameContainer() {
       });
 
       gameInstanceRef.current = game;
-      setGameBootError(null);
     } catch (error) {
       console.error('Failed to initialize Phaser game:', error);
-      setGameBootError(error instanceof Error ? error : new Error('Unable to initialize the game.'));
+      const bootError = error instanceof Error ? error : new Error('Unable to initialize the game.');
+      bootErrorFrame = window.requestAnimationFrame(() => {
+        setGameBootError(bootError);
+      });
     }
 
     // Cleanup on unmount
     return () => {
+      if (bootErrorFrame !== null) {
+        window.cancelAnimationFrame(bootErrorFrame);
+      }
+
       eventBridge.off('collectible:collected', handleCollectibleCollected);
       eventBridge.off('title:begin', handleTitleBegin);
       eventBridge.off('game:ready', handleGameReady);
       eventBridge.off('quest:portal-open', handlePortalOpen);
       eventBridge.off('quest:complete', handleQuestComplete);
+      eventBridge.off('game:audio-panel', handleGameAudioPanel);
 
       if (gameInstanceRef.current) {
         gameInstanceRef.current.destroy(true);
@@ -273,6 +289,7 @@ export default function GameContainer() {
 
   const continueAfterPowerup = () => {
     setCurrentPowerup(null);
+    setIsGameAudioPanelOpen(false);
 
     window.requestAnimationFrame(() => {
       focusGameArea();
@@ -341,7 +358,8 @@ export default function GameContainer() {
   const mobileTouchControlsVisible = isMobileGameDevice
     && isLandscape
     && (gamePhase === 'playing' || gamePhase === 'portal')
-    && !currentPowerup;
+    && !currentPowerup
+    && !isGameAudioPanelOpen;
   const shellClasses = [
     'min-h-screen overflow-hidden bg-[#07080c] text-white',
     isMobileGameDevice ? 'game-shell--mobile' : 'game-shell--desktop',
