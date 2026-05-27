@@ -1904,6 +1904,8 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    const mobileGameplayDevice = this.isMobileGameplayDevice();
+
     this.isBossIntroPlaying = true;
     this.isBossResetting = false;
     this.isGameActive = false;
@@ -1912,21 +1914,23 @@ export class Level1 extends Phaser.Scene {
     this.player.getSprite().body.setVelocity(0, 0);
     this.player.getSwordHitbox().body.enable = false;
     this.enemies.forEach(enemy => enemy.clearDaggers());
-    this.lockBossArena();
+    this.lockBossArena({ immediate: mobileGameplayDevice });
     this.startGameMusic();
-    this.showBossIntro(retry);
-    this.showBossHealthBar(true);
+    this.showBossIntro(retry, { immediate: mobileGameplayDevice });
+    this.showBossHealthBar(true, { immediate: mobileGameplayDevice });
     this.updateBossHealthBar();
 
-    this.cameras.main.stopFollow();
-    this.cameras.main.pan(BOSS_ARENA.bossX - 90, WORLD.HEIGHT / 2, 900, 'Sine.easeInOut');
-    this.cameras.main.zoomTo(1.08, 900, 'Sine.easeInOut');
-    this.cameras.main.shake(220, 0.004);
+    if (!mobileGameplayDevice) {
+      this.cameras.main.stopFollow();
+      this.cameras.main.pan(BOSS_ARENA.bossX - 90, WORLD.HEIGHT / 2, 900, 'Sine.easeInOut');
+      this.cameras.main.zoomTo(1.08, 900, 'Sine.easeInOut');
+      this.cameras.main.shake(220, 0.004);
+    }
 
     this.boss.resetForRetry();
-    this.boss.startIntro();
+    this.boss.startIntro({ immediate: mobileGameplayDevice });
 
-    this.time.delayedCall(1550, () => {
+    this.time.delayedCall(mobileGameplayDevice ? 1260 : 1550, () => {
       if (this.isQuestComplete || this.isBossDefeated) {
         return;
       }
@@ -1935,13 +1939,15 @@ export class Level1 extends Phaser.Scene {
       this.isGameActive = true;
       this.physics.resume();
       this.runTimer.resumeRun('boss_intro');
-      this.cameras.main.zoomTo(1, 520, 'Sine.easeInOut');
+      if (!mobileGameplayDevice) {
+        this.cameras.main.zoomTo(1, 520, 'Sine.easeInOut');
+      }
       this.cameras.main.startFollow(this.player.getSprite());
       this.updateHud(retry ? 'Face the Gatekeeper again.' : 'Defeat the Gatekeeper.');
     });
   }
 
-  lockBossArena() {
+  lockBossArena({ immediate = false } = {}) {
     if (!this.bossGate) {
       return;
     }
@@ -1952,6 +1958,14 @@ export class Level1 extends Phaser.Scene {
       .setAlpha(0.18)
       .setFillStyle(0x12070a, 0.7)
       .setStrokeStyle(2, 0xf97316, 0.82);
+
+    if (immediate) {
+      this.tweens.killTweensOf([this.bossGate, this.bossGateLabel]);
+      this.bossGate.setAlpha(0.9);
+      this.bossGateLabel?.setAlpha(0.92);
+      return;
+    }
+
     this.tweens.killTweensOf([this.bossGate, this.bossGateLabel]);
     this.tweens.add({
       targets: this.bossGate,
@@ -1967,12 +1981,20 @@ export class Level1 extends Phaser.Scene {
     });
   }
 
-  unlockBossGate() {
+  unlockBossGate({ immediate = false } = {}) {
     if (!this.bossGate) {
       return;
     }
 
     this.bossGate.body.enable = false;
+
+    if (immediate) {
+      this.tweens.killTweensOf([this.bossGate, this.bossGateLabel]);
+      this.bossGate.setAlpha(0).setVisible(false);
+      this.bossGateLabel?.setAlpha(0);
+      return;
+    }
+
     this.tweens.killTweensOf([this.bossGate, this.bossGateLabel]);
     this.tweens.add({
       targets: [this.bossGate, this.bossGateLabel],
@@ -1985,7 +2007,7 @@ export class Level1 extends Phaser.Scene {
     });
   }
 
-  showBossIntro(retry = false) {
+  showBossIntro(retry = false, { immediate = false } = {}) {
     if (!this.bossDarkness || !this.bossIntroTitle || !this.bossIntroSubtitle) {
       return;
     }
@@ -1995,6 +2017,14 @@ export class Level1 extends Phaser.Scene {
     this.bossDarkness.setVisible(true);
     this.bossIntroTitle.setVisible(true).setAlpha(0);
     this.bossIntroSubtitle.setVisible(true).setAlpha(0);
+
+    if (immediate) {
+      this.tweens.killTweensOf([this.bossDarkness, this.bossIntroTitle, this.bossIntroSubtitle]);
+      this.bossDarkness.setAlpha(0.22);
+      this.bossIntroTitle.setVisible(false).setAlpha(0);
+      this.bossIntroSubtitle.setVisible(false).setAlpha(0);
+      return;
+    }
 
     this.tweens.killTweensOf([this.bossDarkness, this.bossIntroTitle, this.bossIntroSubtitle]);
     this.tweens.add({
@@ -2023,8 +2053,14 @@ export class Level1 extends Phaser.Scene {
     });
   }
 
-  showBossHealthBar(show) {
+  showBossHealthBar(show, { immediate = false } = {}) {
     if (!this.bossHealthContainer) {
+      return;
+    }
+
+    if (immediate) {
+      this.tweens.killTweensOf(this.bossHealthContainer);
+      this.bossHealthContainer.setVisible(show).setAlpha(show ? 1 : 0);
       return;
     }
 

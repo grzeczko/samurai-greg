@@ -66,7 +66,7 @@ export class DemonSamuraiBoss {
     this.attackHitbox.body.enable = false;
   }
 
-  startIntro() {
+  startIntro({ immediate = false } = {}) {
     this.clearTimers();
     this.clearAttackHitbox();
     this.hp = this.maxHp;
@@ -93,6 +93,27 @@ export class DemonSamuraiBoss {
     this.aura.setPosition(this.sprite.x, this.sprite.y + 12)
       .setVisible(true)
       .setAlpha(0);
+
+    if (immediate) {
+      this.sprite.setPosition(this.spawnX, this.spawnY);
+      this.aura.setPosition(this.spawnX, this.spawnY + 12)
+        .setVisible(true)
+        .setAlpha(0.18)
+        .setScale(1.25, 0.82);
+      playSfx(this.scene, SFX_KEYS.PORTAL, { volume: 0.32, rate: 0.72, detune: -260 });
+
+      this.addTimer(1260, () => {
+        if (this.state !== 'intro' || this.defeated) {
+          return;
+        }
+
+        this.state = 'idle';
+        this.sprite.play(ANIM_KEYS.BOSS_IDLE, true);
+      });
+
+      return;
+    }
+
     this.scene.tweens.add({
       targets: this.aura,
       alpha: 0.18,
