@@ -380,6 +380,28 @@ export class Level1 extends Phaser.Scene {
     this.scale.setGameSize(nextWidth, MOBILE_GAME_HEIGHT);
   }
 
+  isMobileGameplayDevice() {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+    const primaryCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const anyCoarse = window.matchMedia('(any-pointer: coarse)').matches;
+    const noHover = window.matchMedia('(hover: none)').matches;
+    const touchCapable = maxTouchPoints > 0 || primaryCoarse || anyCoarse;
+    const viewport = window.visualViewport;
+    const width = Math.round(viewport?.width ?? window.innerWidth);
+    const height = Math.round(viewport?.height ?? window.innerHeight);
+    const shortestSide = Math.min(width, height);
+    const longestSide = Math.max(width, height);
+    const phoneViewport = shortestSide <= 760 && longestSide <= 980;
+    const tabletViewport = shortestSide <= 1024 && longestSide <= 1366;
+    const likelyTablet = touchCapable && tabletViewport && (primaryCoarse || anyCoarse || noHover || maxTouchPoints > 1);
+
+    return touchCapable && (phoneViewport || likelyTablet);
+  }
+
   setupEvents() {
     eventBridge.on('game:start', this.startGame, this);
     eventBridge.on('powerup:continue', this.resumeGameplay, this);
@@ -2125,6 +2147,8 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    const mobileGameplayDevice = this.isMobileGameplayDevice();
+
     gameControls.resetTouch();
     this.isBossDefeated = true;
     this.isBossEncounterStarted = false;
@@ -2136,7 +2160,10 @@ export class Level1 extends Phaser.Scene {
     this.updateBossHealthBar();
     this.showBossHealthBar(false);
     this.unlockBossGate();
-    this.cameras.main.shake(520, 0.008);
+
+    if (!mobileGameplayDevice) {
+      this.cameras.main.shake(520, 0.008);
+    }
 
     if (this.gameMusic) {
       audioManager.fadeOutAndStop(this, this.gameMusic, 900, () => {
@@ -2144,7 +2171,6 @@ export class Level1 extends Phaser.Scene {
       });
     }
 
-    this.time.delayedCall(1000, () => this.createGoldenResumeGlow(BOSS_ARENA.bossX, BOSS_ARENA.bossY));
     eventBridge.emit('quest:boss-defeated', {
       completion_time_ms: this.completionTimeMs,
       completion_time_display: this.runTimer.formatElapsedTime(this.completionTimeMs),
@@ -2153,6 +2179,14 @@ export class Level1 extends Phaser.Scene {
       total_codexes: this.levelPowerups.length,
       score: this.score,
     });
+
+    if (mobileGameplayDevice) {
+      playSfx(this, SFX_KEYS.PORTAL, { volume: 0.55, rate: 0.7, detune: -260 });
+      this.openPortal();
+      return;
+    }
+
+    this.time.delayedCall(1000, () => this.createGoldenResumeGlow(BOSS_ARENA.bossX, BOSS_ARENA.bossY));
     this.time.delayedCall(1600, () => {
       playSfx(this, SFX_KEYS.PORTAL, { volume: 0.55, rate: 0.7, detune: -260 });
       this.openPortal();
