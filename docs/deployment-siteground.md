@@ -118,6 +118,29 @@ If SiteGround does not allow the cross-directory rewrite from `public_html` to `
 
 Do not expose the full Laravel app directory as a public document root. Only `backend/public` should be web-accessible.
 
+## SEO Operations
+
+The frontend build now publishes these crawl and preview files from `public_html`:
+
+- `https://rzeczko.com/robots.txt`
+- `https://rzeczko.com/sitemap.xml`
+- `https://rzeczko.com/site.webmanifest`
+- `https://rzeczko.com/samurai-greg-og.png`
+
+After deployment, submit the sitemap to Google Search Console and Bing Webmaster Tools:
+
+1. Add and verify the `https://rzeczko.com` property.
+2. Submit `https://rzeczko.com/sitemap.xml`.
+3. Request reindexing for `/`, `/resume`, and `/contact` after major content changes.
+
+Recommended post-deploy preview checks:
+
+- Facebook Sharing Debugger: `https://developers.facebook.com/tools/debug/`
+- LinkedIn Post Inspector: `https://www.linkedin.com/post-inspector/inspect/`
+- Twitter Card Validator alternatives or live X/Discord preview checks using `https://rzeczko.com`
+
+Production should enforce a single canonical host on HTTPS. The metadata layer points to the non-`www` domain, so configure any `www.rzeczko.com` hostname to `301` redirect to `https://rzeczko.com`.
+
 ## Manual Deploy
 
 Open the GitHub Actions tab, choose **Deploy to SiteGround**, and run the workflow manually. The same workflow also runs automatically after pushes to `main`.

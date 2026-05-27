@@ -739,18 +739,37 @@ export default function GameContainer() {
       />
 
       <main className="game-shell__main px-4 pb-10 sm:px-6 lg:pb-14">
+        <section aria-label="Interactive portfolio summary" className="sr-only">
+          <h2>Interactive software engineer portfolio</h2>
+          <p>
+            Samurai Greg is an interactive samurai-themed resume game and playable software engineer portfolio by Gregory Rzeczko.
+            The experience combines React, Phaser, and Laravel to present full-stack engineering work, boss battles, resume power-ups,
+            and a Hall of Fame leaderboard inside a cinematic quest.
+          </p>
+        </section>
+
         <section
           ref={gameAreaRef}
           tabIndex={-1}
           aria-label="Samurai Greg Phaser game"
+          aria-describedby="game-stage-description"
           className="game-stage-section mx-auto w-full max-w-5xl scroll-mt-6 focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-orange-300"
         >
+          <p id="game-stage-description" className="sr-only">
+            Play an interactive resume game built with React and Phaser. Explore the world, collect resume power-ups,
+            defeat boss battles, and unlock portfolio details powered by a Laravel backend.
+          </p>
           <div className="game-stage-progress mb-3 text-center text-sm text-gray-400">
             Skills collected: {collectedPowerups.length} / {LEVEL_POWERUP_IDS.length}
           </div>
           <div className="game-stage-shell relative overflow-hidden rounded-[1.65rem] border border-orange-200/12 bg-[#050607] shadow-[0_28px_95px_rgba(0,0,0,0.62),0_0_65px_rgba(251,146,60,0.08)]">
-            <div ref={gameFrameRef} className="game-stage-shell__frame relative aspect-[1024/600] w-full overflow-hidden bg-black">
-              {!gameBootError && <div id="phaser-container" className="h-full w-full bg-black" />}
+            <div
+              ref={gameFrameRef}
+              className="game-stage-shell__frame relative aspect-[1024/600] w-full overflow-hidden bg-black"
+              role="img"
+              aria-label="Playable Samurai Greg portfolio game canvas"
+            >
+              {!gameBootError && <div id="phaser-container" className="h-full w-full bg-black" aria-hidden="true" />}
               {gameBootError && (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#050607] px-6 text-center text-white">
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Game Unavailable</p>
@@ -850,7 +869,7 @@ export default function GameContainer() {
           </div>
         </section>
       </main>
-      <footer className="border-t border-white/10 py-6 text-center text-sm text-gray-400">
+      <footer aria-label="Site footer" className="border-t border-white/10 py-6 text-center text-sm text-gray-400">
         Built with <a href="https://phaser.io" target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 font-semibold">Phaser 4</a>
         <span className="mx-2 text-gray-500">|</span>
         <a href="https://github.com/grzeczko/samurai-greg" target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 font-semibold">GitHub Repo</a>

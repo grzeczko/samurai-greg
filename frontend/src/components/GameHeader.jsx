@@ -13,7 +13,10 @@ export default function GameHeader({ onActionHover, onActionPress, onPressStart 
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.2),transparent_34%),linear-gradient(180deg,rgba(7,8,12,0.98),rgba(17,24,39,0.88)_48%,rgba(7,8,12,0.96))]" />
       <div className="game-header__fog pointer-events-none absolute inset-x-0 top-0 -z-10 h-full opacity-70" />
 
-      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 sm:absolute sm:right-6 sm:top-5 sm:mb-0 sm:justify-end">
+      <nav
+        aria-label="Primary"
+        className="mb-6 flex flex-wrap items-center justify-center gap-2 sm:absolute sm:right-6 sm:top-5 sm:mb-0 sm:justify-end"
+      >
         <Link
           to="/resume"
           aria-label="View Gregory resume"
@@ -37,7 +40,7 @@ export default function GameHeader({ onActionHover, onActionPress, onPressStart 
           <Mail size={15} aria-hidden="true" />
           Contact Me
         </Link>
-      </div>
+      </nav>
 
       <div className="mx-auto flex max-w-5xl flex-col items-center">
         <div className="game-header__badge inline-flex items-center rounded-full border border-orange-300/35 bg-orange-500/10 px-4 py-2 text-sm font-bold text-orange-100 shadow-[0_0_28px_rgba(249,115,22,0.2)]">
@@ -79,7 +82,7 @@ export default function GameHeader({ onActionHover, onActionPress, onPressStart 
             ))}
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm">
+          <nav aria-label="Professional profiles" className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm">
             <a
               href={resumeLinks.linkedIn}
               target="_blank"
@@ -107,7 +110,7 @@ export default function GameHeader({ onActionHover, onActionPress, onPressStart 
               <ExternalLink size={15} aria-hidden="true" />
               GitHub
             </a>
-          </div>
+          </nav>
         </div>
 
         <div className="game-header__action-panel mt-8 w-full max-w-4xl overflow-hidden rounded-[30px] border border-amber-200/14 bg-[linear-gradient(180deg,rgba(20,16,12,0.8),rgba(9,12,18,0.92))] px-4 py-5 shadow-[0_24px_80px_rgba(0,0,0,0.35),0_0_30px_rgba(245,158,11,0.08)] backdrop-blur-md sm:px-6 sm:py-6">
