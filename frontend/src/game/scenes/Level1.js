@@ -6,6 +6,7 @@ import { DemonSamuraiBoss } from '../entities/DemonSamuraiBoss.js';
 import { COLORS, PLAYER, WORLD } from '../utils/constants.js';
 import { eventBridge } from '../events.js';
 import { resumePowerups } from '../../data/resumePowerups.js';
+import { gameControls } from '../input/controlsState.js';
 import {
   SFX_KEYS,
   TEXTURE_KEYS,
@@ -2124,6 +2125,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    gameControls.resetTouch();
     this.isBossDefeated = true;
     this.isBossEncounterStarted = false;
     this.isBossIntroPlaying = false;
@@ -2194,6 +2196,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    gameControls.resetTouch();
     this.isPortalOpen = true;
 
     const portalX = BOSS_ARENA.portalX;
@@ -2269,6 +2272,7 @@ export class Level1 extends Phaser.Scene {
       return;
     }
 
+    gameControls.resetTouch();
     this.isQuestComplete = true;
     this.isGameActive = false;
     this.runTimer.pauseRun('completion_screen');
