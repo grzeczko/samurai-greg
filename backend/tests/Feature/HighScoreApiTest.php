@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\HighScore;
+use App\Models\HighScoreRunSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -39,10 +40,15 @@ class HighScoreApiTest extends TestCase
     {
         Config::set('high_scores.min_time_ms', 30000);
 
+        [$sessionId, $submissionToken] = $this->createVerifiedRunSession(deathCount: 1);
+        $this->travel(91)->seconds();
+
         $response = $this
             ->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
             ->withHeader('User-Agent', 'Samurai Test Browser')
             ->postJson('/api/high-scores', [
+                'session_id' => $sessionId,
+                'submission_token' => $submissionToken,
                 'player_name' => '  <b>Greg</b>  ',
                 'location' => ' Chicago ',
                 'completion_time_ms' => 90560,
@@ -72,7 +78,11 @@ class HighScoreApiTest extends TestCase
     {
         Config::set('high_scores.min_time_ms', 30000);
 
+        [$sessionId, $submissionToken] = $this->createVerifiedRunSession();
+
         $response = $this->postJson('/api/high-scores', [
+            'session_id' => $sessionId,
+            'submission_token' => $submissionToken,
             'player_name' => 'Speedrunner',
             'location' => 'Nowhere',
             'completion_time_ms' => 2500,
@@ -99,11 +109,21 @@ class HighScoreApiTest extends TestCase
             ]);
         }
 
-        $slowResponse = $this->postJson('/api/high-scores', [
+        [$slowSessionId, $slowSubmissionToken] = $this->createVerifiedRunSession();
+        $this->travel(62)->seconds();
+
+        $slowResponse = $this->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+            ->withHeader('User-Agent', 'Samurai Test Browser')
+            ->postJson('/api/high-scores', [
+            'session_id' => $slowSessionId,
+            'submission_token' => $slowSubmissionToken,
             'player_name' => 'Too Slow',
             'location' => 'Dojo',
             'completion_time_ms' => 61000,
             'device_type' => 'desktop',
+            'codexes_collected' => 18,
+            'total_codexes' => 18,
+            'death_count' => 0,
         ]);
 
         $slowResponse
@@ -111,15 +131,98 @@ class HighScoreApiTest extends TestCase
             ->assertJsonPath('accepted', false)
             ->assertJsonPath('not_qualified', true);
 
-        $fastResponse = $this->postJson('/api/high-scores', [
+        [$fastSessionId, $fastSubmissionToken] = $this->createVerifiedRunSession();
+        $this->travel(61)->seconds();
+
+        $fastResponse = $this->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+            ->withHeader('User-Agent', 'Samurai Test Browser')
+            ->postJson('/api/high-scores', [
+            'session_id' => $fastSessionId,
+            'submission_token' => $fastSubmissionToken,
             'player_name' => 'Fast Enough',
             'location' => 'Dojo',
             'completion_time_ms' => 60010,
             'device_type' => 'mobile',
+            'codexes_collected' => 18,
+            'total_codexes' => 18,
+            'death_count' => 0,
         ]);
 
         $fastResponse
             ->assertCreated()
             ->assertJsonPath('accepted', true);
+    }
+
+    public function test_high_score_submission_requires_a_verified_run_session(): void
+    {
+        $response = $this->postJson('/api/high-scores', [
+            'player_name' => 'Intruder',
+            'location' => 'Spoofed',
+            'completion_time_ms' => 60000,
+            'device_type' => 'desktop',
+            'codexes_collected' => 18,
+            'total_codexes' => 18,
+            'death_count' => 0,
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['session_id', 'submission_token']);
+    }
+
+    private function createVerifiedRunSession(int $deathCount = 0): array
+    {
+        $sessionResponse = $this
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+            ->withHeader('User-Agent', 'Samurai Test Browser')
+            ->postJson('/api/high-scores/session');
+
+        $sessionResponse
+            ->assertCreated()
+            ->assertJsonPath('success', true);
+
+        $sessionId = $sessionResponse->json('session_id');
+        $submissionToken = $sessionResponse->json('submission_token');
+
+        $this
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+            ->withHeader('User-Agent', 'Samurai Test Browser')
+            ->postJson("/api/high-scores/session/{$sessionId}", [
+                'submission_token' => $submissionToken,
+                'event_type' => 'codex_collected',
+                'codexes_collected' => 18,
+                'total_codexes' => 18,
+            ])
+            ->assertOk();
+
+        $this
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+            ->withHeader('User-Agent', 'Samurai Test Browser')
+            ->postJson("/api/high-scores/session/{$sessionId}", [
+                'submission_token' => $submissionToken,
+                'event_type' => 'boss_defeated',
+                'codexes_collected' => 18,
+                'total_codexes' => 18,
+            ])
+            ->assertOk();
+
+        if ($deathCount > 0) {
+            $this
+                ->withServerVariables(['REMOTE_ADDR' => '127.0.1.1'])
+                ->withHeader('User-Agent', 'Samurai Test Browser')
+                ->postJson("/api/high-scores/session/{$sessionId}", [
+                    'submission_token' => $submissionToken,
+                    'event_type' => 'player_died',
+                    'death_count' => $deathCount,
+                ])
+                ->assertOk();
+        }
+
+        $session = HighScoreRunSession::query()->where('public_id', $sessionId)->firstOrFail();
+        $session->forceFill([
+            'death_count' => $deathCount,
+        ])->save();
+
+        return [$sessionId, $submissionToken];
     }
 }

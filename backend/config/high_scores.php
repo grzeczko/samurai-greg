@@ -6,4 +6,5 @@ return [
     'max_time_ms' => env('HIGH_SCORE_MAX_TIME_MS') !== null
         ? (int) env('HIGH_SCORE_MAX_TIME_MS')
         : null,
+    'run_session_ttl_seconds' => (int) env('HIGH_SCORE_RUN_SESSION_TTL_SECONDS', 3600),
 ];

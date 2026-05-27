@@ -1,4 +1,5 @@
 export const HIGH_SCORES_ENDPOINT = import.meta.env.VITE_HIGH_SCORES_API_URL || '/api/high-scores';
+export const HIGH_SCORES_SESSION_ENDPOINT = `${HIGH_SCORES_ENDPOINT.replace(/\/+$/, '')}/session`;
 
 export function formatCompletionTime(milliseconds = 0) {
   const safeMilliseconds = Math.max(0, Number(milliseconds) || 0);
@@ -74,7 +75,46 @@ export async function fetchHighScores() {
   return parseJsonResponse(response);
 }
 
+export async function createHighScoreSession() {
+  const response = await fetch(HIGH_SCORES_SESSION_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function reportHighScoreSessionProgress({
+  sessionId,
+  submissionToken,
+  eventType,
+  codexesCollected,
+  totalCodexes,
+  deathCount,
+}) {
+  const response = await fetch(`${HIGH_SCORES_SESSION_ENDPOINT}/${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      submission_token: submissionToken,
+      event_type: eventType,
+      codexes_collected: codexesCollected,
+      total_codexes: totalCodexes,
+      death_count: deathCount,
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
 export async function submitHighScore({
+  sessionId,
+  submissionToken,
   playerName,
   location,
   completionTimeMs,
@@ -91,6 +131,8 @@ export async function submitHighScore({
       Accept: 'application/json',
     },
     body: JSON.stringify({
+      session_id: sessionId,
+      submission_token: submissionToken,
       player_name: playerName,
       location,
       completion_time_ms: completionTimeMs,

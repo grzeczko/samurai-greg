@@ -36,6 +36,8 @@ class StoreHighScoreRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'session_id' => ['required', 'string', 'uuid'],
+            'submission_token' => ['required', 'string', 'min:32', 'max:255'],
             'player_name' => ['required', 'string', 'max:40'],
             'location' => ['required', 'string', 'max:60'],
             'completion_time_ms' => ['required', 'integer'],
@@ -85,6 +87,8 @@ class StoreHighScoreRequest extends FormRequest
     public function payload(): array
     {
         return $this->safe()->only([
+            'session_id',
+            'submission_token',
             'player_name',
             'location',
             'completion_time_ms',
@@ -104,6 +108,8 @@ class StoreHighScoreRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'session_id.required' => 'A verified run session is required.',
+            'submission_token.required' => 'A verified run token is required.',
             'player_name.required' => 'Enter your name to record your run.',
             'location.required' => 'Enter your location to record your run.',
             'completion_time_ms.required' => 'A completion time is required.',

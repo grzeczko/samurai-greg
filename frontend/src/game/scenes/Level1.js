@@ -2086,6 +2086,7 @@ export class Level1 extends Phaser.Scene {
     this.isGameActive = false;
     this.isPlayerInvulnerable = true;
     this.deathCount += 1;
+    eventBridge.emit('player:died', { death_count: this.deathCount });
     this.runTimer.pauseRun('game_over');
     this.score = Math.max(0, this.score - 100);
     playSfx(this, SFX_KEYS.PLAYER_HURT, { volume: 0.44 });
@@ -2428,6 +2429,7 @@ export class Level1 extends Phaser.Scene {
     this.isGameActive = false;
     this.isPlayerInvulnerable = true;
     this.deathCount += 1;
+    eventBridge.emit('player:died', { death_count: this.deathCount });
     this.runTimer.pauseRun('game_over');
     this.enemies.forEach(enemy => enemy.clearDaggers());
     this.player.playDeath();

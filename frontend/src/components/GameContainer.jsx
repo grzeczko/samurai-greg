@@ -15,10 +15,12 @@ import PauseMenuOverlay from './PauseMenuOverlay.jsx';
 import ResumeCard from './ResumeCard.jsx';
 import { CompletionScreen } from './ResumeQuestOverlays.jsx';
 import {
+  createHighScoreSession,
   fetchHighScores,
   formatCompletionTime,
   getDeviceType,
   getProvisionalRank,
+  reportHighScoreSessionProgress,
   qualifiesForLeaderboard,
   submitHighScore,
 } from '../services/highScoreService.js';
@@ -165,6 +167,7 @@ export default function GameContainer() {
   const gameFrameRef = useRef(null);
   const lastHeroHoverAtRef = useRef(0);
   const pendingStartRef = useRef(false);
+  const runSessionRef = useRef(null);
   const mobileDeviceRef = useRef(false);
   const landscapeRef = useRef(true);
   const [gamePhase, setGamePhase] = useState('title');
@@ -341,6 +344,27 @@ export default function GameContainer() {
     return true;
   }, [getLevelScene]);
 
+  const reportRunProgress = useCallback(async (eventType, payload = {}) => {
+    const runSession = runSessionRef.current;
+
+    if (!runSession?.sessionId || !runSession?.submissionToken) {
+      return;
+    }
+
+    try {
+      await reportHighScoreSessionProgress({
+        sessionId: runSession.sessionId,
+        submissionToken: runSession.submissionToken,
+        eventType,
+        codexesCollected: payload.codexesCollected,
+        totalCodexes: payload.totalCodexes,
+        deathCount: payload.deathCount,
+      });
+    } catch {
+      // Leave the run playable even if verification progress cannot be reported.
+    }
+  }, []);
+
   const requestMobileFullscreen = useCallback(() => {
     if (!mobileDeviceRef.current) {
       return;
@@ -371,7 +395,14 @@ export default function GameContainer() {
 
     const handleCollectibleCollected = (powerup) => {
       setCurrentPowerup(powerup);
-      setCollectedPowerups(prev => (prev.includes(powerup.id) ? prev : [...prev, powerup.id]));
+      setCollectedPowerups((prev) => {
+        const next = prev.includes(powerup.id) ? prev : [...prev, powerup.id];
+        void reportRunProgress('codex_collected', {
+          codexesCollected: next.length,
+          totalCodexes: LEVEL_POWERUP_IDS.length,
+        });
+        return next;
+      });
     };
 
     const handlePortalOpen = () => {
@@ -381,10 +412,21 @@ export default function GameContainer() {
     const handleBossDefeated = (payload = {}) => {
       const run = normalizeCompletionRun(payload);
 
+      void reportRunProgress('boss_defeated', {
+        codexesCollected: Number(payload.codexes_collected ?? payload.codexesCollected ?? LEVEL_POWERUP_IDS.length),
+        totalCodexes: Number(payload.total_codexes ?? payload.totalCodexes ?? LEVEL_POWERUP_IDS.length),
+      });
+
       if (run) {
         setCompletionRun(run);
         setRecordState(EMPTY_RECORD_STATE);
       }
+    };
+
+    const handlePlayerDied = ({ death_count: deathCount, deathCount: fallbackDeathCount } = {}) => {
+      void reportRunProgress('player_died', {
+        deathCount: Number(deathCount ?? fallbackDeathCount ?? 0),
+      });
     };
 
     const handleQuestComplete = ({ powerups = [], ...payload } = {}) => {
@@ -420,18 +462,31 @@ export default function GameContainer() {
       );
     };
 
-    const handleGameReady = () => {
+    const handleGameReady = async () => {
       if (!pendingStartRef.current) {
         return;
       }
 
       pendingStartRef.current = false;
+
+      try {
+        const payload = await createHighScoreSession();
+        runSessionRef.current = {
+          sessionId: payload.session_id,
+          submissionToken: payload.submission_token,
+          expiresAt: payload.expires_at,
+        };
+      } catch {
+        runSessionRef.current = null;
+      }
+
       eventBridge.emit('game:start');
     };
 
     eventBridge.on('collectible:collected', handleCollectibleCollected);
     eventBridge.on('title:begin', handleTitleBegin);
     eventBridge.on('game:ready', handleGameReady);
+    eventBridge.on('player:died', handlePlayerDied);
     eventBridge.on('quest:boss-defeated', handleBossDefeated);
     eventBridge.on('quest:portal-open', handlePortalOpen);
     eventBridge.on('quest:complete', handleQuestComplete);
@@ -465,6 +520,7 @@ export default function GameContainer() {
       eventBridge.off('collectible:collected', handleCollectibleCollected);
       eventBridge.off('title:begin', handleTitleBegin);
       eventBridge.off('game:ready', handleGameReady);
+      eventBridge.off('player:died', handlePlayerDied);
       eventBridge.off('quest:boss-defeated', handleBossDefeated);
       eventBridge.off('quest:portal-open', handlePortalOpen);
       eventBridge.off('quest:complete', handleQuestComplete);
@@ -567,6 +623,7 @@ export default function GameContainer() {
     setCompletionRun(null);
     setCompletionLeaderboard(EMPTY_COMPLETION_LEADERBOARD);
     setRecordState(EMPTY_RECORD_STATE);
+    runSessionRef.current = null;
     pendingStartRef.current = false;
     gameInstanceRef.current?.scene.stop('Level1');
     gameInstanceRef.current?.scene.start('TitleScene');
@@ -577,6 +634,16 @@ export default function GameContainer() {
       return;
     }
 
+    const runSession = runSessionRef.current;
+
+    if (!runSession?.sessionId || !runSession?.submissionToken) {
+      setRecordState({
+        ...EMPTY_RECORD_STATE,
+        error: 'Run verification is unavailable for this attempt. Please play again to submit a verified Hall of Fame run.',
+      });
+      return;
+    }
+
     setRecordState({
       ...EMPTY_RECORD_STATE,
       submitting: true,
@@ -584,6 +651,8 @@ export default function GameContainer() {
 
     try {
       const payload = await submitHighScore({
+        sessionId: runSession.sessionId,
+        submissionToken: runSession.submissionToken,
         playerName,
         location,
         completionTimeMs: completionRun.completionTimeMs,
@@ -594,6 +663,7 @@ export default function GameContainer() {
       });
 
       if (!payload.accepted) {
+        runSessionRef.current = null;
         setRecordState({
           ...EMPTY_RECORD_STATE,
           error: payload.message || 'That run no longer qualifies for the Hall of Fame.',
@@ -612,6 +682,7 @@ export default function GameContainer() {
         message: payload.message || 'Your legend has been recorded.',
         error: '',
       });
+      runSessionRef.current = null;
 
       fetchHighScores()
         .then((refreshed) => {

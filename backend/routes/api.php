@@ -7,6 +7,11 @@ use Illuminate\Support\Facades\Route;
 Route::post('/contact', ContactController::class)
     ->middleware('throttle:contact');
 
+Route::post('/high-scores/session', [HighScoreController::class, 'createSession'])
+    ->middleware('throttle:high-scores-submit');
+Route::post('/high-scores/session/{session}', [HighScoreController::class, 'updateSessionProgress'])
+    ->middleware('throttle:high-scores-submit');
+
 Route::get('/high-scores', [HighScoreController::class, 'index'])
     ->middleware('throttle:high-scores-read');
 
