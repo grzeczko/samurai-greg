@@ -40,6 +40,24 @@ class AppServiceProvider extends ServiceProvider
                 ], 429));
         });
 
+        RateLimiter::for('high-scores-session-create', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'message' => 'Too many Hall of Fame session requests. Please wait a minute and try again.',
+                ], 429));
+        });
+
+        RateLimiter::for('high-scores-session-progress', function (Request $request) {
+            return Limit::perMinute(120)
+                ->by($request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'message' => 'Too many Hall of Fame verification events. Please wait a minute and try again.',
+                ], 429));
+        });
+
         RateLimiter::for('high-scores-read', function (Request $request) {
             return Limit::perMinute(60)
                 ->by($request->ip())
