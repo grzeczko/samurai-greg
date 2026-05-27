@@ -117,6 +117,7 @@ const MOBILE_PHASE_HELPER_COPY = {
 export default function GameContainer() {
   const gameInstanceRef = useRef(null);
   const gameAreaRef = useRef(null);
+  const gameFrameRef = useRef(null);
   const lastHeroHoverAtRef = useRef(0);
   const pendingStartRef = useRef(false);
   const mobileDeviceRef = useRef(false);
@@ -134,8 +135,27 @@ export default function GameContainer() {
     landscapeRef.current = isLandscape;
   }, [isMobileGameDevice, isLandscape]);
 
+  useEffect(() => {
+    const lockViewport = isMobileGameDevice && gamePhase !== 'title';
+    document.documentElement.classList.toggle('game-mobile-viewport-lock', lockViewport);
+    document.body.classList.toggle('game-mobile-viewport-lock', lockViewport);
+
+    if (lockViewport) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+
+    return () => {
+      document.documentElement.classList.remove('game-mobile-viewport-lock');
+      document.body.classList.remove('game-mobile-viewport-lock');
+    };
+  }, [gamePhase, isMobileGameDevice]);
+
   const focusGameArea = useCallback(() => {
-    gameAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (mobileDeviceRef.current) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } else {
+      gameAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     window.requestAnimationFrame(() => {
       gameAreaRef.current?.focus({ preventScroll: true });
@@ -168,7 +188,7 @@ export default function GameContainer() {
       return;
     }
 
-    const target = gameAreaRef.current;
+    const target = gameFrameRef.current || gameAreaRef.current;
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
 
     if (!target || fullscreenElement) {
@@ -386,7 +406,7 @@ export default function GameContainer() {
             Skills collected: {collectedPowerups.length} / {LEVEL_POWERUP_IDS.length}
           </div>
           <div className="game-stage-shell relative overflow-hidden rounded-[1.65rem] border border-orange-200/12 bg-[#050607] shadow-[0_28px_95px_rgba(0,0,0,0.62),0_0_65px_rgba(251,146,60,0.08)]">
-            <div className="game-stage-shell__frame relative aspect-[1024/600] w-full overflow-hidden bg-black">
+            <div ref={gameFrameRef} className="game-stage-shell__frame relative aspect-[1024/600] w-full overflow-hidden bg-black">
               {!gameBootError && <div id="phaser-container" className="h-full w-full bg-black" />}
               {gameBootError && (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#050607] px-6 text-center text-white">

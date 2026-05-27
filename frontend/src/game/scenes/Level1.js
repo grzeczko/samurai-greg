@@ -171,6 +171,10 @@ const BOSS_ARENA = {
   portalY: WORLD.HEIGHT - 74,
 };
 
+const MOBILE_GAME_HEIGHT = 600;
+const MOBILE_GAME_MIN_WIDTH = 800;
+const MOBILE_GAME_MAX_WIDTH = 1500;
+
 export class Level1 extends Phaser.Scene {
   constructor() {
     super({ key: 'Level1' });
@@ -268,6 +272,7 @@ export class Level1 extends Phaser.Scene {
       .map(id => resumePowerups.find(powerup => powerup.id === id))
       .filter(Boolean);
 
+    this.configureMobileGameplaySize();
     this.physics.world.setBounds(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
 
     this.createBackground();
@@ -321,6 +326,41 @@ export class Level1 extends Phaser.Scene {
 
       this.resetPlayer('Careful down there.');
     }
+  }
+
+  configureMobileGameplaySize() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+    const primaryCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const anyCoarse = window.matchMedia('(any-pointer: coarse)').matches;
+    const touchCapable = maxTouchPoints > 0 || primaryCoarse || anyCoarse;
+
+    if (!touchCapable) {
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    const width = Math.round(viewport?.width ?? window.innerWidth);
+    const height = Math.round(viewport?.height ?? window.innerHeight);
+
+    if (width < height || width <= 0 || height <= 0) {
+      return;
+    }
+
+    const nextWidth = Phaser.Math.Clamp(
+      Math.round(MOBILE_GAME_HEIGHT * (width / height)),
+      MOBILE_GAME_MIN_WIDTH,
+      MOBILE_GAME_MAX_WIDTH,
+    );
+
+    if (Math.abs(this.scale.width - nextWidth) <= 1 && this.scale.height === MOBILE_GAME_HEIGHT) {
+      return;
+    }
+
+    this.scale.setGameSize(nextWidth, MOBILE_GAME_HEIGHT);
   }
 
   setupEvents() {
@@ -1519,6 +1559,7 @@ export class Level1 extends Phaser.Scene {
     };
 
     this.input.on('pointerdown', this.handleGameUnlockRetry, this);
+    this.input.on('pointerup', this.handleGameUnlockRetry, this);
     this.input.keyboard?.on('keydown', this.handleGameUnlockRetryKey, this);
   }
 
@@ -1591,6 +1632,7 @@ export class Level1 extends Phaser.Scene {
 
     if (this.handleGameUnlockRetry) {
       this.input.off('pointerdown', this.handleGameUnlockRetry, this);
+      this.input.off('pointerup', this.handleGameUnlockRetry, this);
       this.handleGameUnlockRetry = null;
     }
 

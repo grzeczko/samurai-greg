@@ -298,8 +298,41 @@ class AudioManager {
       const handleUnlock = () => finish(true);
 
       sound.once(PHASER_SOUND_UNLOCKED_EVENT, handleUnlock);
-      timeoutId = window.setTimeout(() => finish(!sound.locked), timeoutMs);
+      timeoutId = window.setTimeout(() => {
+        const contextRunning = sound.context?.state === 'running';
+        finish(!sound.locked || contextRunning);
+      }, timeoutMs);
     });
+  }
+
+  warmUpWebAudioContext(context) {
+    if (!context || typeof context.createBufferSource !== 'function') {
+      return;
+    }
+
+    try {
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+
+      source.buffer = context.createBuffer(1, 1, 22050);
+      gain.gain.value = 0;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(0);
+      source.stop(context.currentTime + 0.01);
+    } catch {
+      // Silent unlock warm-up is best-effort only.
+    }
+  }
+
+  markSceneAudioUnlocked(sound) {
+    if (!sound || !sound.locked) {
+      return;
+    }
+
+    sound.locked = false;
+    sound.unlocked = false;
+    sound.emit?.(PHASER_SOUND_UNLOCKED_EVENT, sound);
   }
 
   async unlockSceneAudio(scene) {
@@ -322,6 +355,8 @@ class AudioManager {
     }
 
     const context = sound.context;
+    this.warmUpWebAudioContext(context);
+
     const shouldResumeContext = context
       && typeof context.resume === 'function'
       && (context.state === 'suspended' || context.state === 'interrupted');
@@ -329,9 +364,10 @@ class AudioManager {
     if (shouldResumeContext) {
       try {
         await context.resume();
+        this.warmUpWebAudioContext(context);
 
         if (sound.locked && context.state === 'running') {
-          sound.unlocked = true;
+          this.markSceneAudioUnlocked(sound);
         }
       } catch {
         return this.waitForSceneAudioUnlock(scene, 450);
@@ -339,7 +375,7 @@ class AudioManager {
     }
 
     if (sound.locked && context?.state === 'running') {
-      sound.unlocked = true;
+      this.markSceneAudioUnlocked(sound);
     }
 
     if (sound.locked) {

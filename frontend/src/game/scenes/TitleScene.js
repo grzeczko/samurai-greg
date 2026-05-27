@@ -374,6 +374,7 @@ export class TitleScene extends Phaser.Scene {
     };
 
     this.input.on('pointerdown', this.handleUnlockRetry, this);
+    this.input.on('pointerup', this.handleUnlockRetry, this);
     this.input.keyboard?.on('keydown', this.handleUnlockRetryKey, this);
   }
 
@@ -1015,6 +1016,7 @@ export class TitleScene extends Phaser.Scene {
 
     if (this.handleUnlockRetry) {
       this.input.off('pointerdown', this.handleUnlockRetry, this);
+      this.input.off('pointerup', this.handleUnlockRetry, this);
       this.handleUnlockRetry = null;
     }
 
