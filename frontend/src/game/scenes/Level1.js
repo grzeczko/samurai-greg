@@ -233,6 +233,7 @@ export class Level1 extends Phaser.Scene {
     this.pendingGameMusicRetry = false;
     this.handleGameUnlockRetry = null;
     this.handleGameUnlockRetryKey = null;
+    this.handleGameNativeUnlockRetry = null;
     this.waitingForGameAudioUnlock = false;
     this.shouldAutoStart = false;
   }
@@ -960,6 +961,8 @@ export class Level1 extends Phaser.Scene {
     const useLargeTouchLayout = touchCapable && (phoneViewport || likelyTablet);
 
     if (useLargeTouchLayout) {
+      const uiScale = this.getGameAudioUiScale();
+      const ui = (value) => Math.round(value * uiScale);
       const modalWidth = Math.max(260, this.scale.width - 24);
       const modalHeight = Math.max(220, this.scale.height - 24);
 
@@ -971,18 +974,23 @@ export class Level1 extends Phaser.Scene {
         innerHeight: modalHeight,
         panelX: (this.scale.width - modalWidth) / 2,
         panelY: (this.scale.height - modalHeight) / 2,
-        titleFontSize: '22px',
-        statusFontSize: '15px',
-        toggleWidth: modalWidth - 44,
-        toggleHeight: 54,
-        toggleFontSize: '18px',
-        labelFontSize: '15px',
-        sliderWidth: modalWidth - 128,
-        sliderStartX: 96,
-        musicY: 122,
-        sfxY: 176,
-        closeRadius: 22,
-        closeY: 18,
+        headerPadX: ui(22),
+        statusInset: ui(78),
+        closeInset: ui(32),
+        titleY: ui(25),
+        titleFontSize: `${ui(26)}px`,
+        statusFontSize: `${ui(16)}px`,
+        toggleWidth: modalWidth - ui(56),
+        toggleHeight: ui(68),
+        toggleY: ui(78),
+        toggleFontSize: `${ui(20)}px`,
+        labelFontSize: `${ui(16)}px`,
+        sliderWidth: modalWidth - ui(168),
+        sliderStartX: ui(112),
+        musicY: ui(140),
+        sfxY: ui(218),
+        closeRadius: ui(24),
+        closeY: ui(25),
       };
     }
 
@@ -1007,6 +1015,20 @@ export class Level1 extends Phaser.Scene {
       closeRadius: 10,
       closeY: 16,
     };
+  }
+
+  getGameAudioUiScale() {
+    if (typeof window === 'undefined') {
+      return 1;
+    }
+
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth ?? this.scale.width;
+
+    if (!viewportWidth) {
+      return 1;
+    }
+
+    return Phaser.Math.Clamp(this.scale.width / viewportWidth, 1, 1.85);
   }
 
   setGameAudioPanelInputEnabled(enabled) {
@@ -1137,29 +1159,40 @@ export class Level1 extends Phaser.Scene {
       0.06,
     )
       .setScrollFactor(0);
-    const title = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + 16 : 16, 'Audio', {
+    const title = this.add.text(
+      layout.isModal ? shellX + (layout.headerPadX ?? 18) : 18,
+      layout.isModal ? shellY + (layout.titleY ?? 16) : 16,
+      'Audio',
+      {
       fontFamily: 'Georgia, Times New Roman, serif',
       fontSize: layout.titleFontSize,
       fontStyle: 'bold',
       color: '#f5ddb0',
       letterSpacing: 0.8,
-    }).setOrigin(0, 0.5).setScrollFactor(0);
-    const statusText = this.add.text(layout.isModal ? shellX + layout.innerWidth - 58 : 190, layout.isModal ? shellY + 16 : 16, 'Muted', {
+      }
+    ).setOrigin(0, 0.5).setScrollFactor(0);
+    const statusText = this.add.text(
+      layout.isModal ? shellX + layout.innerWidth - (layout.statusInset ?? 58) : 190,
+      layout.isModal ? shellY + (layout.titleY ?? 16) : 16,
+      'Muted',
+      {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.statusFontSize,
       fontStyle: 'bold',
       color: '#d6b98f',
-    }).setOrigin(1, 0.5).setScrollFactor(0);
+      }
+    ).setOrigin(1, 0.5).setScrollFactor(0);
 
     let closeButton = null;
     let closeLabel = null;
 
     if (layout.isModal) {
-      closeButton = this.add.circle(shellX + layout.innerWidth - 26, shellY + layout.closeY, layout.closeRadius, 0x17161d, 0.96)
+      const closeX = shellX + layout.innerWidth - (layout.closeInset ?? 26);
+      closeButton = this.add.circle(closeX, shellY + layout.closeY, layout.closeRadius, 0x17161d, 0.96)
         .setStrokeStyle(1, 0xf3d38b, 0.34)
         .setInteractive({ useHandCursor: true })
         .setScrollFactor(0);
-      closeLabel = this.add.text(shellX + layout.innerWidth - 26, shellY + layout.closeY - 0.5, 'X', {
+      closeLabel = this.add.text(closeX, shellY + layout.closeY - 0.5, 'X', {
         fontFamily: 'Arial, sans-serif',
         fontSize: layout.labelFontSize,
         fontStyle: 'bold',
@@ -1167,11 +1200,11 @@ export class Level1 extends Phaser.Scene {
       }).setOrigin(0.5).setScrollFactor(0);
     }
 
-    const soundToggle = this.add.rectangle(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + 66 : 43, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
+    const soundToggle = this.add.rectangle(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + (layout.toggleY ?? 66) : 43, layout.toggleWidth, layout.toggleHeight, 0x17161d, 0.96)
       .setStrokeStyle(1, 0xf3d38b, 0.38)
       .setInteractive({ useHandCursor: true })
       .setScrollFactor(0);
-    const soundToggleLabel = this.add.text(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + 66 : 43, 'AUDIO OFF', {
+    const soundToggleLabel = this.add.text(layout.isModal ? shellCenterX : 104, layout.isModal ? shellY + (layout.toggleY ?? 66) : 43, 'AUDIO OFF', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.toggleFontSize,
       fontStyle: 'bold',
@@ -1198,14 +1231,14 @@ export class Level1 extends Phaser.Scene {
       });
     }
 
-    const musicLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.musicY : layout.musicY, 'MUSIC', {
+    const musicLabel = this.add.text(layout.isModal ? shellX + (layout.headerPadX ?? 18) : 18, layout.isModal ? shellY + layout.musicY : layout.musicY, 'MUSIC', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
       color: '#d7c2a0',
       letterSpacing: 0.8,
     }).setOrigin(0, 0.5).setScrollFactor(0);
-    const sfxLabel = this.add.text(layout.isModal ? shellX + 18 : 18, layout.isModal ? shellY + layout.sfxY : layout.sfxY, 'SFX', {
+    const sfxLabel = this.add.text(layout.isModal ? shellX + (layout.headerPadX ?? 18) : 18, layout.isModal ? shellY + layout.sfxY : layout.sfxY, 'SFX', {
       fontFamily: 'Arial, sans-serif',
       fontSize: layout.labelFontSize,
       fontStyle: 'bold',
@@ -1301,11 +1334,13 @@ export class Level1 extends Phaser.Scene {
     const settings = audioManager.getSettings();
     const value = type === 'music' ? settings.musicVolume : settings.sfxVolume;
     const touchOptimized = width > 120;
-    const trackGlowHeight = touchOptimized ? 28 : 10;
-    const trackHeight = touchOptimized ? 12 : 3;
-    const knobGlowRadius = touchOptimized ? 18 : 7;
-    const knobRadius = touchOptimized ? 14 : 4.5;
-    const hitAreaHeight = touchOptimized ? 60 : 14;
+    const uiScale = touchOptimized ? this.getGameAudioUiScale() : 1;
+    const ui = (nextValue) => Math.round(nextValue * uiScale);
+    const trackGlowHeight = touchOptimized ? ui(40) : 10;
+    const trackHeight = touchOptimized ? ui(14) : 3;
+    const knobGlowRadius = touchOptimized ? ui(24) : 7;
+    const knobRadius = touchOptimized ? ui(18) : 4.5;
+    const hitAreaHeight = touchOptimized ? ui(76) : 14;
     let activePointerId = null;
 
     const container = this.add.container(x, y).setScrollFactor(0);
@@ -1558,19 +1593,39 @@ export class Level1 extends Phaser.Scene {
       }
     };
 
+    this.handleGameNativeUnlockRetry = () => {
+      const settings = audioManager.getSettings();
+      const contextState = this.sound?.context?.state;
+      const shouldRetry = settings.musicEnabled
+        && !settings.muted
+        && (
+          this.pendingGameMusicRetry
+          || this.sound?.locked
+          || contextState === 'suspended'
+          || contextState === 'interrupted'
+        );
+
+      if (shouldRetry) {
+        this.requestGameAudioUnlockAndStart({ force: true });
+      }
+    };
+
     this.input.on('pointerdown', this.handleGameUnlockRetry, this);
     this.input.on('pointerup', this.handleGameUnlockRetry, this);
     this.input.keyboard?.on('keydown', this.handleGameUnlockRetryKey, this);
+    window.addEventListener('touchend', this.handleGameNativeUnlockRetry, { passive: true });
+    window.addEventListener('pointerup', this.handleGameNativeUnlockRetry, { passive: true });
+    window.addEventListener('click', this.handleGameNativeUnlockRetry, { passive: true });
   }
 
-  requestGameAudioUnlockAndStart() {
+  requestGameAudioUnlockAndStart({ force = false } = {}) {
     if (!this.sound) {
       return;
     }
 
     this.pendingGameMusicRetry = true;
 
-    if (this.waitingForGameAudioUnlock) {
+    if (this.waitingForGameAudioUnlock && !force) {
       this.refreshGameSoundHud();
       return;
     }
@@ -1639,6 +1694,13 @@ export class Level1 extends Phaser.Scene {
     if (this.handleGameUnlockRetryKey) {
       this.input.keyboard?.off('keydown', this.handleGameUnlockRetryKey, this);
       this.handleGameUnlockRetryKey = null;
+    }
+
+    if (this.handleGameNativeUnlockRetry) {
+      window.removeEventListener('touchend', this.handleGameNativeUnlockRetry);
+      window.removeEventListener('pointerup', this.handleGameNativeUnlockRetry);
+      window.removeEventListener('click', this.handleGameNativeUnlockRetry);
+      this.handleGameNativeUnlockRetry = null;
     }
   }
 
