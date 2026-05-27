@@ -17,7 +17,7 @@ return [
 
     'paths' => ['api/*'],
 
-    'allowed_methods' => ['POST', 'OPTIONS'],
+    'allowed_methods' => ['GET', 'POST', 'OPTIONS'],
 
     'allowed_origins' => array_values(array_filter(array_map('trim', array_merge([
         'https://rzeczko.com',

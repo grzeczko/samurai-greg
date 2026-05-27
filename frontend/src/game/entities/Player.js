@@ -103,6 +103,17 @@ export class Player {
   }
 
   trackKey(event, isDown) {
+    const eventTarget = event.target;
+    const isEditableTarget = eventTarget instanceof HTMLElement
+      && (
+        eventTarget.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(eventTarget.tagName)
+      );
+
+    if (isEditableTarget) {
+      return;
+    }
+
     const movementKeys = new Set([
       'ArrowLeft',
       'ArrowRight',

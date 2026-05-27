@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, Mail, Play } from 'lucide-react';
+import { ExternalLink, Mail, Play, RotateCcw, Trophy } from 'lucide-react';
 import { getPowerupTheme } from '../data/resumePowerups.js';
+import HighScoresTable from './HighScoresTable.jsx';
 import ResumeDownloadButtons from './ResumeDownloadButtons.jsx';
 
 const QUEST_LINKS = {
@@ -45,7 +47,16 @@ export function StartScreen({ onStart, title, subtitle }) {
   );
 }
 
-export function CompletionScreen({ collectedPowerups }) {
+export function CompletionScreen({
+  collectedPowerups,
+  completionRun,
+  leaderboardState,
+  recordState,
+  onRecordRun,
+  onPlayAgain,
+}) {
+  const [playerName, setPlayerName] = useState('');
+  const [location, setLocation] = useState('');
   // Group powerups by zone
   const groupedPowerups = {
     education: collectedPowerups.filter(p => p.zone === 'education'),
@@ -71,6 +82,18 @@ export function CompletionScreen({ collectedPowerups }) {
     achievements: 'text-amber-300',
   };
 
+  const completionTime = completionRun?.completionTimeDisplay || '--:--.--';
+  const showRecordForm = leaderboardState?.checked && leaderboardState?.qualified && !recordState?.accepted;
+  const showLeaderboard = recordState?.accepted || (leaderboardState?.checked && leaderboardState?.qualified === false);
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onRecordRun?.({
+      playerName,
+      location,
+    });
+  };
+
   return (
     <OverlayShell>
       <div className="quest-completion-panel w-full max-w-4xl rounded-lg border border-emerald-300/40 bg-gray-900/95 px-8 py-7 shadow-2xl">
@@ -82,7 +105,84 @@ export function CompletionScreen({ collectedPowerups }) {
           <p className="mx-auto mt-3 max-w-xl text-gray-300">
             You collected {collectedPowerups.length} resume powerups from {Object.values(groupedPowerups).filter(g => g.length > 0).length} zones.
           </p>
+          <div className="quest-completion-time" aria-label={`Completion time ${completionTime}`}>
+            <span>Official Time</span>
+            <strong>{completionTime}</strong>
+          </div>
         </div>
+
+        <section className="quest-completion-hof" aria-label="Hall of Fame result">
+          {leaderboardState?.loading && (
+            <p className="quest-completion-hof__status">Checking the Samurai Greg Hall of Fame...</p>
+          )}
+
+          {leaderboardState?.error && (
+            <p className="quest-completion-hof__error">{leaderboardState.error}</p>
+          )}
+
+          {showRecordForm && (
+            <form className="quest-completion-hof__form" onSubmit={handleSubmit}>
+              <div className="quest-completion-hof__copy">
+                <Trophy size={24} aria-hidden="true" />
+                <div>
+                  <p>Congratulations, warrior.</p>
+                  <h3>You ranked #{leaderboardState.provisionalRank} in the Samurai Greg Hall of Fame.</h3>
+                  <span>Enter your name and location below to record your quest.</span>
+                </div>
+              </div>
+
+              <div className="quest-completion-hof__fields">
+                <label>
+                  <span>Name</span>
+                  <input
+                    value={playerName}
+                    onChange={(event) => setPlayerName(event.target.value)}
+                    maxLength={40}
+                    required
+                    autoComplete="name"
+                  />
+                </label>
+                <label>
+                  <span>Location</span>
+                  <input
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    maxLength={60}
+                    required
+                    autoComplete="address-level2"
+                  />
+                </label>
+              </div>
+
+              {recordState?.error && <p className="quest-completion-hof__error">{recordState.error}</p>}
+
+              <button
+                type="submit"
+                disabled={recordState?.submitting}
+                className="quest-completion-hof__record"
+              >
+                {recordState?.submitting ? 'Recording...' : 'Record My Run'}
+              </button>
+            </form>
+          )}
+
+          {recordState?.accepted && (
+            <div className="quest-completion-hof__success">
+              <Trophy size={22} aria-hidden="true" />
+              <p>{recordState.message || 'Your legend has been recorded.'}</p>
+            </div>
+          )}
+
+          {leaderboardState?.checked && !leaderboardState.qualified && (
+            <div className="quest-completion-hof__missed">
+              <p>Your time did not enter the top 25, but the quest is complete.</p>
+            </div>
+          )}
+
+          {showLeaderboard && (
+            <HighScoresTable scores={leaderboardState.scores} compact />
+          )}
+        </section>
 
         <div className="mt-6 max-h-80 space-y-4 overflow-y-auto pr-2">
           {Object.entries(groupedPowerups).map(([zone, powerups]) => {
@@ -122,6 +222,14 @@ export function CompletionScreen({ collectedPowerups }) {
         <ResumeDownloadButtons className="mt-6" showViewResume />
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={onPlayAgain}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/30 px-6 py-3 font-bold text-white transition hover:border-amber-200 hover:text-amber-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300"
+          >
+            <RotateCcw size={18} aria-hidden="true" />
+            Play Again
+          </button>
           <Link
             to={QUEST_LINKS.contact}
             aria-label="Contact Gregory about opportunities"

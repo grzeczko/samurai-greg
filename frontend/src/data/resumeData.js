@@ -1,4 +1,5 @@
 export const resumeLinks = {
+  interactiveResume: 'https://rzeczko.com',
   linkedIn: 'https://www.linkedin.com/in/gregory-rzeczko-3076b63/',
   github: 'https://github.com/grzeczko',
   stackOverflow: 'https://stackoverflow.com/users/2872366/gregory-r',
@@ -11,6 +12,7 @@ export const resumeData = {
   contactRows: [
     [
       { text: 'East Nashville, Nashville, TN' },
+      { text: 'Interactive Resume: Rzeczko.com', href: resumeLinks.interactiveResume },
       { text: 'LinkedIn: gregory-rzeczko-3076b63', href: resumeLinks.linkedIn },
     ],
     [
@@ -31,10 +33,6 @@ export const resumeData = {
     {
       label: 'Backend, Data & AI',
       value: 'Python, PHP (Laravel, Symfony), Ruby on Rails, Node.js, C#, Java, OpenAI, Machine Learning, Data Science, Tableau',
-    },
-    {
-      label: 'Mobile Apps',
-      value: 'Capacitor, cross-platform mobile application development for iOS and Android',
     },
     {
       label: 'Security, Databases & Testing',

@@ -15,6 +15,7 @@ import {
 } from '../assets.js';
 import { createSectionSign } from '../ui/worldVisuals.js';
 import { audioManager } from '../audio/AudioManager.js';
+import { RunTimer } from '../timing/RunTimer.js';
 
 const TILE_SIZE = 32;
 const WALL_FACE_VISUAL_EXTENSION = 4;
@@ -209,8 +210,13 @@ export class Level1 extends Phaser.Scene {
     this.isBossIntroPlaying = false;
     this.isBossDefeated = false;
     this.isBossResetting = false;
+    this.isManualPaused = false;
     this.pendingGameMusicRetry = false;
     this.waitingForGameAudioUnlock = false;
+    this.runTimer = new RunTimer();
+    this.completionTimeMs = null;
+    this.deathCount = 0;
+    this.codexesCollected = 0;
     this.currentCheckpoint = {
       id: 'start',
       x: PLAYER.START_X,
@@ -219,6 +225,7 @@ export class Level1 extends Phaser.Scene {
     this.scoreText = null;
     this.livesText = null;
     this.throwsText = null;
+    this.timerText = null;
     this.statusText = null;
     this.gameMusic = null;
     this.gameSoundButton = null;
@@ -234,6 +241,7 @@ export class Level1 extends Phaser.Scene {
     this.handleGameUnlockRetry = null;
     this.handleGameUnlockRetryKey = null;
     this.handleGameNativeUnlockRetry = null;
+    this.handlePauseToggleKey = null;
     this.waitingForGameAudioUnlock = false;
     this.shouldAutoStart = false;
   }
@@ -260,6 +268,11 @@ export class Level1 extends Phaser.Scene {
     this.isBossIntroPlaying = false;
     this.isBossDefeated = false;
     this.isBossResetting = false;
+    this.isManualPaused = false;
+    this.runTimer.reset();
+    this.completionTimeMs = null;
+    this.deathCount = 0;
+    this.codexesCollected = 0;
     this.currentCheckpoint = {
       id: 'start',
       x: PLAYER.START_X,
@@ -311,6 +324,8 @@ export class Level1 extends Phaser.Scene {
   }
 
   update() {
+    this.refreshTimerHud();
+
     if (!this.isGameActive || this.isQuestComplete) {
       return;
     }
@@ -373,8 +388,16 @@ export class Level1 extends Phaser.Scene {
     eventBridge.on('ui:menu-hover', this.handleExternalMenuHover, this);
     eventBridge.on('ui:menu-confirm', this.handleExternalMenuConfirm, this);
     eventBridge.on('ui:press-start', this.handleExternalPressStart, this);
+    eventBridge.on('game:pause-request', this.toggleManualPause, this);
+    eventBridge.on('game:pause-resume', this.resumeFromManualPause, this);
+    eventBridge.on('game:pause-restart-checkpoint', this.restartFromCheckpointPause, this);
+    this.installPauseInputHandlers();
     this.installGameUnlockRetryHandlers();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.isManualPaused) {
+        eventBridge.emit('game:pause-change', { paused: false });
+      }
+
       eventBridge.off('game:start', this.startGame, this);
       eventBridge.off('powerup:continue', this.resumeGameplay, this);
       eventBridge.off('codex:open', this.handleCodexOpen, this);
@@ -383,6 +406,10 @@ export class Level1 extends Phaser.Scene {
       eventBridge.off('ui:menu-hover', this.handleExternalMenuHover, this);
       eventBridge.off('ui:menu-confirm', this.handleExternalMenuConfirm, this);
       eventBridge.off('ui:press-start', this.handleExternalPressStart, this);
+      eventBridge.off('game:pause-request', this.toggleManualPause, this);
+      eventBridge.off('game:pause-resume', this.resumeFromManualPause, this);
+      eventBridge.off('game:pause-restart-checkpoint', this.restartFromCheckpointPause, this);
+      this.cleanupPauseInputHandlers();
       this.cleanupLevelAudio();
     });
   }
@@ -495,6 +522,7 @@ export class Level1 extends Phaser.Scene {
     }
 
     this.score += 100;
+    this.codexesCollected += 1;
     playSfx(this, SFX_KEYS.PICKUP, { volume: 0.34 });
     eventBridge.emit('collectible:collected', collectible.powerup);
     this.collectibles = this.collectibles.filter(c => c !== collectible);
@@ -761,6 +789,8 @@ export class Level1 extends Phaser.Scene {
 
     this.isGameActive = true;
     this.physics.resume();
+    this.runTimer.startRun();
+    this.runTimer.resumeRun('objective_screen');
     this.updateHud('Collect the career powerups.');
   }
 
@@ -770,6 +800,7 @@ export class Level1 extends Phaser.Scene {
     }
 
     this.hideGameAudioPanel(true);
+    this.runTimer.pauseRun('codex_open');
     this.isGameActive = false;
     this.player.getSprite().body.setVelocity(0, 0);
     this.player.getSwordHitbox().body.enable = false;
@@ -778,7 +809,7 @@ export class Level1 extends Phaser.Scene {
   }
 
   resumeGameplay() {
-    if (this.isQuestComplete) {
+    if (this.isQuestComplete || this.isManualPaused) {
       return;
     }
 
@@ -786,6 +817,81 @@ export class Level1 extends Phaser.Scene {
     this.isGameActive = true;
     this.enemies.forEach(enemy => enemy.resumePatrol());
     this.physics.resume();
+    this.runTimer.resumeRun('codex_open');
+    this.updateHud(
+      this.isPortalOpen
+        ? 'Find the final portal.'
+        : this.isBossArenaReady
+          ? 'Reach the final gate.'
+        : 'Keep collecting powerups.'
+    );
+  }
+
+  installPauseInputHandlers() {
+    this.handlePauseToggleKey = (event) => {
+      event?.preventDefault?.();
+      this.toggleManualPause();
+    };
+
+    this.input.keyboard?.on('keydown-P', this.handlePauseToggleKey, this);
+    this.input.keyboard?.on('keydown-ESC', this.handlePauseToggleKey, this);
+  }
+
+  cleanupPauseInputHandlers() {
+    if (!this.handlePauseToggleKey) {
+      return;
+    }
+
+    this.input.keyboard?.off('keydown-P', this.handlePauseToggleKey, this);
+    this.input.keyboard?.off('keydown-ESC', this.handlePauseToggleKey, this);
+    this.handlePauseToggleKey = null;
+  }
+
+  canOpenManualPause() {
+    return this.isGameActive
+      && !this.isQuestComplete
+      && !this.isBossIntroPlaying
+      && !this.isBossDefeated
+      && !this.isBossResetting
+      && !this.isPlayerDying;
+  }
+
+  toggleManualPause() {
+    if (this.isManualPaused) {
+      this.resumeFromManualPause();
+      return;
+    }
+
+    this.openManualPause();
+  }
+
+  openManualPause() {
+    if (!this.canOpenManualPause()) {
+      return;
+    }
+
+    this.hideGameAudioPanel(true);
+    this.isManualPaused = true;
+    this.isGameActive = false;
+    this.player.getSprite().body.setVelocity(0, 0);
+    this.player.getSwordHitbox().body.enable = false;
+    this.enemies.forEach(enemy => enemy.clearDaggers());
+    this.physics.pause();
+    this.runTimer.pauseRun('pause_menu');
+    this.updateHud('Quest paused.');
+    eventBridge.emit('game:pause-change', { paused: true });
+  }
+
+  resumeFromManualPause() {
+    if (!this.isManualPaused || this.isQuestComplete) {
+      return;
+    }
+
+    this.isManualPaused = false;
+    this.isGameActive = true;
+    this.enemies.forEach(enemy => enemy.resumePatrol());
+    this.physics.resume();
+    this.runTimer.resumeRun('pause_menu');
     this.updateHud(
       this.isPortalOpen
         ? 'Find the final portal.'
@@ -793,6 +899,37 @@ export class Level1 extends Phaser.Scene {
           ? 'Reach the final gate.'
           : 'Keep collecting powerups.'
     );
+    eventBridge.emit('game:pause-change', { paused: false });
+  }
+
+  restartFromCheckpointPause() {
+    if (!this.isManualPaused || this.isQuestComplete) {
+      return;
+    }
+
+    this.hideGameAudioPanel(true);
+    this.isManualPaused = false;
+    eventBridge.emit('game:pause-change', { paused: false });
+
+    this.lives = 3;
+    this.isPlayerDying = false;
+    this.isPlayerInvulnerable = false;
+    this.enemies.forEach(enemy => enemy.clearDaggers());
+    this.player.getSwordHitbox().body.enable = false;
+    this.player.getSprite().body.setVelocity(0, 0);
+    this.resetPlayer('Checkpoint restored.');
+
+    if (this.currentCheckpoint.id === 'bossArena' && this.isBossEncounterStarted && !this.isBossDefeated) {
+      this.runTimer.pauseRun('boss_intro');
+      this.runTimer.resumeRun('pause_menu');
+      this.beginBossAttempt({ retry: true });
+      return;
+    }
+
+    this.isGameActive = true;
+    this.physics.resume();
+    this.runTimer.resumeRun('pause_menu');
+    this.flashPlayer();
   }
 
   handleCodexOpen({ rarity = 'default' } = {}) {
@@ -880,6 +1017,12 @@ export class Level1 extends Phaser.Scene {
       fontSize: '18px',
       color: '#fde68a',
     }).setScrollFactor(0).setDepth(1000);
+    this.timerText = this.add.text(this.scale.width - 96, 16, '00:00.00', {
+      ...textStyle,
+      fontSize: '16px',
+      color: '#f3d38b',
+      align: 'right',
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(1000);
     this.statusText = this.add.text(this.scale.width / 2, 22, '', {
       ...textStyle,
       fontSize: '18px',
@@ -1741,6 +1884,7 @@ export class Level1 extends Phaser.Scene {
     this.isBossIntroPlaying = true;
     this.isBossResetting = false;
     this.isGameActive = false;
+    this.runTimer.pauseRun('boss_intro');
     this.lives = 3;
     this.player.getSprite().body.setVelocity(0, 0);
     this.player.getSwordHitbox().body.enable = false;
@@ -1767,6 +1911,7 @@ export class Level1 extends Phaser.Scene {
       this.isBossIntroPlaying = false;
       this.isGameActive = true;
       this.physics.resume();
+      this.runTimer.resumeRun('boss_intro');
       this.cameras.main.zoomTo(1, 520, 'Sine.easeInOut');
       this.cameras.main.startFollow(this.player.getSprite());
       this.updateHud(retry ? 'Face the Gatekeeper again.' : 'Defeat the Gatekeeper.');
@@ -1940,6 +2085,8 @@ export class Level1 extends Phaser.Scene {
     this.isPlayerDying = true;
     this.isGameActive = false;
     this.isPlayerInvulnerable = true;
+    this.deathCount += 1;
+    this.runTimer.pauseRun('game_over');
     this.score = Math.max(0, this.score - 100);
     playSfx(this, SFX_KEYS.PLAYER_HURT, { volume: 0.44 });
     this.player.playDeath();
@@ -1964,6 +2111,7 @@ export class Level1 extends Phaser.Scene {
     this.time.delayedCall(850, () => {
       this.lives = 3;
       this.isPlayerDying = false;
+      this.runTimer.resumeRun('game_over');
       this.player.resetToPosition(this.currentCheckpoint.x, this.currentCheckpoint.y);
       this.flashPlayer();
       this.beginBossAttempt({ retry: true });
@@ -1979,6 +2127,7 @@ export class Level1 extends Phaser.Scene {
     this.isBossEncounterStarted = false;
     this.isBossIntroPlaying = false;
     this.isBossResetting = false;
+    this.completionTimeMs = this.runTimer.stopRun();
     this.score += 1000;
     this.updateHud('THE GOLDEN RESUME RECOVERED');
     this.updateBossHealthBar();
@@ -1993,6 +2142,14 @@ export class Level1 extends Phaser.Scene {
     }
 
     this.time.delayedCall(1000, () => this.createGoldenResumeGlow(BOSS_ARENA.bossX, BOSS_ARENA.bossY));
+    eventBridge.emit('quest:boss-defeated', {
+      completion_time_ms: this.completionTimeMs,
+      completion_time_display: this.runTimer.formatElapsedTime(this.completionTimeMs),
+      death_count: this.deathCount,
+      codexes_collected: this.codexesCollected,
+      total_codexes: this.levelPowerups.length,
+      score: this.score,
+    });
     this.time.delayedCall(1600, () => {
       playSfx(this, SFX_KEYS.PORTAL, { volume: 0.55, rate: 0.7, detune: -260 });
       this.openPortal();
@@ -2113,6 +2270,7 @@ export class Level1 extends Phaser.Scene {
 
     this.isQuestComplete = true;
     this.isGameActive = false;
+    this.runTimer.pauseRun('completion_screen');
     this.player.getSprite().body.setVelocity(0, 0);
     this.physics.pause();
     playSfx(this, SFX_KEYS.PORTAL, { volume: 0.5 });
@@ -2121,6 +2279,11 @@ export class Level1 extends Phaser.Scene {
     eventBridge.emit('quest:complete', {
       score: this.score,
       powerups: this.levelPowerups,
+      completion_time_ms: this.completionTimeMs ?? this.runTimer.stopRun(),
+      completion_time_display: this.runTimer.formatElapsedTime(this.completionTimeMs ?? this.runTimer.getElapsedMs()),
+      death_count: this.deathCount,
+      codexes_collected: this.codexesCollected,
+      total_codexes: this.levelPowerups.length,
     });
   }
 
@@ -2141,6 +2304,11 @@ export class Level1 extends Phaser.Scene {
     this.scoreText?.setText(`Score: ${this.score}`);
     this.livesText?.setText(`Lives: ${this.lives}`);
     this.throwsText?.setText(`Throws: ${this.player?.getThrowsRemaining?.() ?? 5}/5`);
+    this.refreshTimerHud();
+  }
+
+  refreshTimerHud() {
+    this.timerText?.setText(this.runTimer.formatElapsedTime());
   }
 
   onPlayerHitEnemy(enemy) {
@@ -2259,6 +2427,8 @@ export class Level1 extends Phaser.Scene {
     this.isPlayerDying = true;
     this.isGameActive = false;
     this.isPlayerInvulnerable = true;
+    this.deathCount += 1;
+    this.runTimer.pauseRun('game_over');
     this.enemies.forEach(enemy => enemy.clearDaggers());
     this.player.playDeath();
     this.updateHud('Fresh run. Lives restored!');
@@ -2269,6 +2439,7 @@ export class Level1 extends Phaser.Scene {
       this.resetPlayer('New run. Keep going!');
       this.isPlayerDying = false;
       this.isGameActive = true;
+      this.runTimer.resumeRun('game_over');
       this.flashPlayer();
     });
   }

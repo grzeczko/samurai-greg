@@ -30,5 +30,23 @@ class AppServiceProvider extends ServiceProvider
                     'message' => 'Too many contact attempts. Please wait a minute and try again.',
                 ], 429));
         });
+
+        RateLimiter::for('high-scores-submit', function (Request $request) {
+            return Limit::perMinute(5)
+                ->by($request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'message' => 'Too many Hall of Fame submissions. Please wait a minute and try again.',
+                ], 429));
+        });
+
+        RateLimiter::for('high-scores-read', function (Request $request) {
+            return Limit::perMinute(60)
+                ->by($request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'message' => 'Too many Hall of Fame requests. Please wait a minute and try again.',
+                ], 429));
+        });
     }
 }

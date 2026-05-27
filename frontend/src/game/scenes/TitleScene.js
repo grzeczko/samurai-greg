@@ -270,6 +270,18 @@ export class TitleScene extends Phaser.Scene {
       color: '#fff5d6',
       align: 'center',
     }).setOrigin(0.5);
+    const hallButtonX = width - 144;
+    const hallButtonY = height - 40;
+    const hallButtonBg = this.add.rectangle(hallButtonX, hallButtonY, 218, 42, 0x07080c, 0.82)
+      .setDepth(20)
+      .setStrokeStyle(1.5, 0xf3d38b, 0.42);
+    const hallButtonText = this.add.text(hallButtonX, hallButtonY, 'HALL OF FAME', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '15px',
+      fontStyle: 'bold',
+      color: '#f4c95a',
+      align: 'center',
+    }).setOrigin(0.5).setDepth(20);
 
     panel.add([
       panelGlow,
@@ -317,6 +329,40 @@ export class TitleScene extends Phaser.Scene {
     });
 
     buttonZone.on('pointerdown', () => this.beginQuest());
+
+    const hallButtonZone = this.add.zone(hallButtonX, hallButtonY, 218, 42)
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setInteractive({ useHandCursor: true });
+
+    hallButtonZone.on('pointerover', () => {
+      if (this.time.now - this.lastHoverSoundAt > 180) {
+        playSfx(this, SFX_KEYS.MENU_HOVER, { volume: 0.1 });
+        this.lastHoverSoundAt = this.time.now;
+      }
+      this.tweens.add({
+        targets: [hallButtonBg, hallButtonText],
+        scaleX: 1.03,
+        scaleY: 1.03,
+        duration: 120,
+        ease: 'Sine.out',
+      });
+    });
+
+    hallButtonZone.on('pointerout', () => {
+      this.tweens.add({
+        targets: [hallButtonBg, hallButtonText],
+        scaleX: 1,
+        scaleY: 1,
+        duration: 140,
+        ease: 'Sine.out',
+      });
+    });
+
+    hallButtonZone.on('pointerdown', () => {
+      playSfx(this, SFX_KEYS.MENU_CONFIRM, { volume: 0.16 });
+      eventBridge.emit('hall-of-fame:open');
+    });
 
     this.tweens.add({
       targets: panel,

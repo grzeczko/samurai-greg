@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
-import gameConfig from '../game/config.js';
+import gameConfig, { GAMEPLAY_CAPTURE_KEYS } from '../game/config.js';
 import { LEVEL_POWERUP_IDS, Level1 } from '../game/scenes/Level1.js';
 import { TitleScene } from '../game/scenes/TitleScene.js';
 import { eventBridge } from '../game/events.js';
@@ -10,8 +10,18 @@ import GameHeader from './GameHeader.jsx';
 import MobileRotatePrompt from './MobileRotatePrompt.jsx';
 import MobileTouchControls from './MobileTouchControls.jsx';
 import ObjectiveScreen from './ObjectiveScreen.jsx';
+import HallOfFameModal from './HallOfFameModal.jsx';
+import PauseMenuOverlay from './PauseMenuOverlay.jsx';
 import ResumeCard from './ResumeCard.jsx';
 import { CompletionScreen } from './ResumeQuestOverlays.jsx';
+import {
+  fetchHighScores,
+  formatCompletionTime,
+  getDeviceType,
+  getProvisionalRank,
+  qualifiesForLeaderboard,
+  submitHighScore,
+} from '../services/highScoreService.js';
 
 const CONTROL_GROUPS = [
   {
@@ -114,6 +124,41 @@ const MOBILE_PHASE_HELPER_COPY = {
   playing: 'Use the on-screen controls to move, jump, strike, dash, throw, and guard.',
 };
 
+function normalizeCompletionRun(payload = {}) {
+  const completionTimeMs = Number(payload.completion_time_ms ?? payload.completionTimeMs ?? 0);
+
+  if (!completionTimeMs) {
+    return null;
+  }
+
+  return {
+    completionTimeMs,
+    completionTimeDisplay: payload.completion_time_display
+      || payload.completionTimeDisplay
+      || formatCompletionTime(completionTimeMs),
+    deathCount: Number(payload.death_count ?? payload.deathCount ?? 0),
+    codexesCollected: Number(payload.codexes_collected ?? payload.codexesCollected ?? 0),
+    totalCodexes: Number(payload.total_codexes ?? payload.totalCodexes ?? LEVEL_POWERUP_IDS.length),
+  };
+}
+
+const EMPTY_COMPLETION_LEADERBOARD = {
+  checked: false,
+  loading: false,
+  error: '',
+  scores: [],
+  qualified: null,
+  provisionalRank: null,
+};
+
+const EMPTY_RECORD_STATE = {
+  submitting: false,
+  accepted: false,
+  rank: null,
+  message: '',
+  error: '',
+};
+
 export default function GameContainer() {
   const gameInstanceRef = useRef(null);
   const gameAreaRef = useRef(null);
@@ -125,10 +170,101 @@ export default function GameContainer() {
   const [gamePhase, setGamePhase] = useState('title');
   const [gameBootError, setGameBootError] = useState(null);
   const [isGameAudioPanelOpen, setIsGameAudioPanelOpen] = useState(false);
+  const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false);
+  const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
+  const [hallOfFameScores, setHallOfFameScores] = useState([]);
+  const [hallOfFameLoading, setHallOfFameLoading] = useState(false);
+  const [hallOfFameError, setHallOfFameError] = useState('');
   const [currentPowerup, setCurrentPowerup] = useState(null);
   const [collectedPowerups, setCollectedPowerups] = useState([]);
   const [completionPowerups, setCompletionPowerups] = useState([]);
+  const [completionRun, setCompletionRun] = useState(null);
+  const [completionLeaderboard, setCompletionLeaderboard] = useState(EMPTY_COMPLETION_LEADERBOARD);
+  const [recordState, setRecordState] = useState(EMPTY_RECORD_STATE);
   const { isMobileGameDevice, isLandscape } = useMobileGameDevice();
+
+  const loadHallOfFameScores = useCallback(async () => {
+    setHallOfFameLoading(true);
+    setHallOfFameError('');
+
+    try {
+      const payload = await fetchHighScores();
+      setHallOfFameScores(payload.scores || []);
+    } catch (error) {
+      setHallOfFameError(error.message || 'The Hall of Fame could not be loaded.');
+    } finally {
+      setHallOfFameLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isHallOfFameOpen) {
+      return;
+    }
+
+    const loadTimer = window.setTimeout(() => {
+      loadHallOfFameScores();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+  }, [isHallOfFameOpen, loadHallOfFameScores]);
+
+  useEffect(() => {
+    if (!completionRun?.completionTimeMs) {
+      return;
+    }
+
+    let isActive = true;
+
+    const loadTimer = window.setTimeout(() => {
+      setCompletionLeaderboard(prev => ({
+        ...prev,
+        loading: true,
+        error: '',
+      }));
+
+      fetchHighScores()
+        .then((payload) => {
+          if (!isActive) {
+            return;
+          }
+
+          const scores = payload.scores || [];
+          const qualified = qualifiesForLeaderboard(scores, completionRun.completionTimeMs);
+          const provisionalRank = qualified
+            ? getProvisionalRank(scores, completionRun.completionTimeMs)
+            : null;
+
+          setCompletionLeaderboard({
+            checked: true,
+            loading: false,
+            error: '',
+            scores,
+            qualified,
+            provisionalRank,
+          });
+        })
+        .catch((error) => {
+          if (!isActive) {
+            return;
+          }
+
+          setCompletionLeaderboard({
+            checked: true,
+            loading: false,
+            error: error.message || 'The Hall of Fame could not be loaded.',
+            scores: [],
+            qualified: null,
+            provisionalRank: null,
+          });
+        });
+    }, 0);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(loadTimer);
+    };
+  }, [completionRun?.completionTimeMs]);
 
   useEffect(() => {
     mobileDeviceRef.current = isMobileGameDevice;
@@ -149,6 +285,28 @@ export default function GameContainer() {
       document.body.classList.remove('game-mobile-viewport-lock');
     };
   }, [gamePhase, isMobileGameDevice]);
+
+  useEffect(() => {
+    const keyboard = gameInstanceRef.current?.input?.keyboard;
+
+    if (!keyboard) {
+      return;
+    }
+
+    if (gamePhase === 'complete') {
+      keyboard.removeCapture?.(GAMEPLAY_CAPTURE_KEYS);
+      keyboard.enabled = false;
+      return () => {
+        keyboard.enabled = true;
+        keyboard.addCapture?.(GAMEPLAY_CAPTURE_KEYS);
+      };
+    }
+
+    keyboard.enabled = true;
+    keyboard.addCapture?.(GAMEPLAY_CAPTURE_KEYS);
+
+    return undefined;
+  }, [gamePhase]);
 
   const focusGameArea = useCallback(() => {
     if (mobileDeviceRef.current) {
@@ -220,17 +378,38 @@ export default function GameContainer() {
       setGamePhase('portal');
     };
 
-    const handleQuestComplete = ({ powerups = [] } = {}) => {
+    const handleBossDefeated = (payload = {}) => {
+      const run = normalizeCompletionRun(payload);
+
+      if (run) {
+        setCompletionRun(run);
+        setRecordState(EMPTY_RECORD_STATE);
+      }
+    };
+
+    const handleQuestComplete = ({ powerups = [], ...payload } = {}) => {
       const completedIds = powerups.map(powerup => powerup.id);
+      const run = normalizeCompletionRun(payload);
       setCurrentPowerup(null);
       setIsGameAudioPanelOpen(false);
       setCollectedPowerups(prev => (completedIds.length > 0 ? completedIds : prev));
       setCompletionPowerups(powerups);
+      if (run) {
+        setCompletionRun(prev => prev ?? run);
+      }
       setGamePhase('complete');
     };
 
     const handleGameAudioPanel = ({ visible = false } = {}) => {
       setIsGameAudioPanelOpen(Boolean(visible));
+    };
+
+    const handlePauseChange = ({ paused = false } = {}) => {
+      setIsPauseMenuOpen(Boolean(paused));
+    };
+
+    const handleHallOfFameOpen = () => {
+      setIsHallOfFameOpen(true);
     };
 
     const handleTitleBegin = () => {
@@ -253,9 +432,12 @@ export default function GameContainer() {
     eventBridge.on('collectible:collected', handleCollectibleCollected);
     eventBridge.on('title:begin', handleTitleBegin);
     eventBridge.on('game:ready', handleGameReady);
+    eventBridge.on('quest:boss-defeated', handleBossDefeated);
     eventBridge.on('quest:portal-open', handlePortalOpen);
     eventBridge.on('quest:complete', handleQuestComplete);
     eventBridge.on('game:audio-panel', handleGameAudioPanel);
+    eventBridge.on('game:pause-change', handlePauseChange);
+    eventBridge.on('hall-of-fame:open', handleHallOfFameOpen);
 
     let bootErrorFrame = null;
 
@@ -283,9 +465,12 @@ export default function GameContainer() {
       eventBridge.off('collectible:collected', handleCollectibleCollected);
       eventBridge.off('title:begin', handleTitleBegin);
       eventBridge.off('game:ready', handleGameReady);
+      eventBridge.off('quest:boss-defeated', handleBossDefeated);
       eventBridge.off('quest:portal-open', handlePortalOpen);
       eventBridge.off('quest:complete', handleQuestComplete);
       eventBridge.off('game:audio-panel', handleGameAudioPanel);
+      eventBridge.off('game:pause-change', handlePauseChange);
+      eventBridge.off('hall-of-fame:open', handleHallOfFameOpen);
 
       if (gameInstanceRef.current) {
         gameInstanceRef.current.destroy(true);
@@ -360,6 +545,92 @@ export default function GameContainer() {
     focusGameArea();
   }, [focusGameArea, isLandscape, isMobileGameDevice, requestMobileFullscreen]);
 
+  const handlePauseRequest = useCallback(() => {
+    eventBridge.emit('game:pause-request');
+  }, []);
+
+  const handlePauseResume = useCallback(() => {
+    eventBridge.emit('game:pause-resume');
+  }, []);
+
+  const handlePauseRestartCheckpoint = useCallback(() => {
+    eventBridge.emit('game:pause-restart-checkpoint');
+  }, []);
+
+  const handlePlayAgain = useCallback(() => {
+    setGamePhase('title');
+    setCurrentPowerup(null);
+    setIsPauseMenuOpen(false);
+    setIsGameAudioPanelOpen(false);
+    setCollectedPowerups([]);
+    setCompletionPowerups([]);
+    setCompletionRun(null);
+    setCompletionLeaderboard(EMPTY_COMPLETION_LEADERBOARD);
+    setRecordState(EMPTY_RECORD_STATE);
+    pendingStartRef.current = false;
+    gameInstanceRef.current?.scene.stop('Level1');
+    gameInstanceRef.current?.scene.start('TitleScene');
+  }, []);
+
+  const handleRecordRun = useCallback(async ({ playerName, location }) => {
+    if (!completionRun?.completionTimeMs) {
+      return;
+    }
+
+    setRecordState({
+      ...EMPTY_RECORD_STATE,
+      submitting: true,
+    });
+
+    try {
+      const payload = await submitHighScore({
+        playerName,
+        location,
+        completionTimeMs: completionRun.completionTimeMs,
+        deviceType: getDeviceType(isMobileGameDevice),
+        deathCount: completionRun.deathCount,
+        codexesCollected: completionRun.codexesCollected,
+        totalCodexes: completionRun.totalCodexes,
+      });
+
+      if (!payload.accepted) {
+        setRecordState({
+          ...EMPTY_RECORD_STATE,
+          error: payload.message || 'That run no longer qualifies for the Hall of Fame.',
+        });
+        setCompletionLeaderboard(prev => ({
+          ...prev,
+          qualified: false,
+        }));
+        return;
+      }
+
+      setRecordState({
+        submitting: false,
+        accepted: true,
+        rank: payload.rank,
+        message: payload.message || 'Your legend has been recorded.',
+        error: '',
+      });
+
+      fetchHighScores()
+        .then((refreshed) => {
+          setCompletionLeaderboard(prev => ({
+            ...prev,
+            scores: refreshed.scores || prev.scores,
+            provisionalRank: payload.rank,
+          }));
+          setHallOfFameScores(refreshed.scores || []);
+        })
+        .catch(() => {});
+    } catch (error) {
+      setRecordState({
+        ...EMPTY_RECORD_STATE,
+        error: error.message || 'Your run could not be recorded. Please try again.',
+      });
+    }
+  }, [completionRun, isMobileGameDevice]);
+
   const helperCopy = isMobileGameDevice ? MOBILE_PHASE_HELPER_COPY : PHASE_HELPER_COPY;
   const controlsHelperText = gamePhase === 'title'
     ? helperCopy.title
@@ -379,7 +650,8 @@ export default function GameContainer() {
     && isLandscape
     && (gamePhase === 'playing' || gamePhase === 'portal')
     && !currentPowerup
-    && !isGameAudioPanelOpen;
+    && !isGameAudioPanelOpen
+    && !isPauseMenuOpen;
   const shellClasses = [
     'min-h-screen overflow-hidden bg-[#07080c] text-white',
     isMobileGameDevice ? 'game-shell--mobile' : 'game-shell--desktop',
@@ -424,7 +696,14 @@ export default function GameContainer() {
                 <MobileRotatePrompt />
               )}
               {!gameBootError && gamePhase === 'complete' && (
-                <CompletionScreen collectedPowerups={completionList} />
+                <CompletionScreen
+                  collectedPowerups={completionList}
+                  completionRun={completionRun}
+                  leaderboardState={completionLeaderboard}
+                  recordState={recordState}
+                  onRecordRun={handleRecordRun}
+                  onPlayAgain={handlePlayAgain}
+                />
               )}
               {!gameBootError && currentPowerup && (
                 <ResumeCard
@@ -432,7 +711,30 @@ export default function GameContainer() {
                   onContinue={continueAfterPowerup}
                 />
               )}
-              {!gameBootError && <MobileTouchControls visible={mobileTouchControlsVisible} />}
+              {!gameBootError && (
+                <MobileTouchControls
+                  visible={mobileTouchControlsVisible}
+                  onPause={handlePauseRequest}
+                />
+              )}
+              {!gameBootError && (
+                <PauseMenuOverlay
+                  open={isPauseMenuOpen}
+                  isMobile={isMobileGameDevice}
+                  onResume={handlePauseResume}
+                  onRestartCheckpoint={handlePauseRestartCheckpoint}
+                />
+              )}
+              {!gameBootError && (
+                <HallOfFameModal
+                  open={isHallOfFameOpen}
+                  scores={hallOfFameScores}
+                  loading={hallOfFameLoading}
+                  error={hallOfFameError}
+                  onClose={() => setIsHallOfFameOpen(false)}
+                  onRefresh={loadHallOfFameScores}
+                />
+              )}
             </div>
 
             <aside

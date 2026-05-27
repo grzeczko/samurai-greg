@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Pause,
   Shield,
   Swords,
   Zap,
@@ -39,7 +40,7 @@ function TouchButton({ action, ariaLabel, className = '', children }) {
   );
 }
 
-export default function MobileTouchControls({ visible }) {
+export default function MobileTouchControls({ visible, onPause }) {
   useEffect(() => {
     const resetTouchControls = () => gameControls.resetTouch();
 
@@ -71,6 +72,19 @@ export default function MobileTouchControls({ visible }) {
       aria-label="Mobile game controls"
       onContextMenu={(event) => event.preventDefault()}
     >
+      <button
+        type="button"
+        className="mobile-touch-controls__pause"
+        aria-label="Pause quest"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onPause?.();
+        }}
+      >
+        <Pause size={18} strokeWidth={2.7} aria-hidden="true" />
+      </button>
+
       <div className="mobile-touch-controls__movement" aria-label="Move">
         <TouchButton
           action="left"

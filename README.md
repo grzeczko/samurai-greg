@@ -43,6 +43,8 @@ The result is designed to communicate several things at once:
 - backend integration discipline
 - visual and audio taste
 
+The final quest completion flow now extends beyond the boss battle: qualifying runs can be recorded into the Samurai Greg Hall of Fame, giving the project a genuine persistence layer instead of a one-and-done ending screen.
+
 ## 3. Live Features
 
 - Cinematic samurai intro sequence with story-driven onboarding
@@ -58,8 +60,9 @@ The result is designed to communicate several things at once:
 - Dedicated resume page for traditional recruiter review
 - Share flow for passing along the interactive experience
 - Laravel-powered contact form with validation, rate limiting, honeypot protection, and reCAPTCHA
+- Live Hall of Fame leaderboard with top-run retrieval, qualification checks, and run submission after quest completion
 - Responsive frontend shell for game, resume, and contact experiences
-- Leaderboard-ready foundation for future progression or score systems
+- Persistent high-score storage with backend validation, throttling, and placeholder states for new boards
 
 ## 4. Gameplay / Experience
 
@@ -136,6 +139,7 @@ As the journey progresses, the player masters traversal and combat mechanics, su
 - `frontend/` owns gameplay, cinematic presentation, resume display, downloads, and contact form UX.
 - `backend/` owns API delivery, validation, reCAPTCHA verification, throttling, honeypot handling, and outbound mail.
 - The contact bridge is intentionally thin: the frontend posts to `/api/contact`, and Laravel handles trust boundaries and server-side enforcement.
+- The Hall of Fame bridge follows the same split: the frontend reads and submits runs via `/api/high-scores`, while Laravel validates payloads, ranking eligibility, and persistence rules.
 - Resume content is modeled in frontend data modules, while downloadable artifacts live separately in `frontend/resumes/`.
 
 ### High-Level Flow
@@ -146,10 +150,14 @@ flowchart LR
 	UI --> Game[Phaser Gameplay Layer]
 	UI --> Resume[Resume Page + Downloads]
 	UI --> Contact[Contact Form]
+	UI --> Hall[Hall of Fame UI]
 	Contact --> API[Laravel Contact API]
+	Hall --> Scores[Laravel High Score API]
 	API --> Verify[reCAPTCHA Verification]
 	API --> Guard[Validation + Honeypot + Rate Limiting]
 	API --> Mail[Mail Delivery]
+	Scores --> Rank[Qualification + Ranking Rules]
+	Scores --> Store[Database Persistence]
 ```
 
 ## 7. Screenshots / GIFs
@@ -210,13 +218,29 @@ The experience is built to feel cinematic rather than purely mechanical. Title m
 ## 10. Backend Features
 
 - Laravel API endpoint for `POST /api/contact`
+- Laravel API endpoints for `GET /api/high-scores` and `POST /api/high-scores`
 - server-side validation for message integrity
 - Google reCAPTCHA verification hook
 - honeypot-based spam suppression
 - request throttling via Laravel middleware
 - mail delivery flow compatible with Mailtrap during development
-- test coverage for valid sends, CORS preflight, validation failures, reCAPTCHA failure, honeypot behavior, and rate limiting
-- scalable API foundation for future leaderboard and persistence features
+- high-score ranking logic with configurable board size and minimum accepted run time
+- placeholder leaderboard rows when the board is not yet full
+- test coverage for valid sends, CORS preflight, validation failures, reCAPTCHA failure, honeypot behavior, rate limiting, high-score retrieval, qualification rejection, and accepted leaderboard submissions
+
+### Hall of Fame API
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `POST` | `/api/contact` | Send contact form submissions through Laravel mail delivery |
+| `GET` | `/api/high-scores` | Return the current Hall of Fame board |
+| `POST` | `/api/high-scores` | Submit a qualifying quest-completion run |
+
+High-score behavior is controlled by backend env values:
+
+- `HIGH_SCORE_LIMIT` controls leaderboard size, default `25`
+- `HIGH_SCORE_MIN_TIME_MS` rejects unrealistically fast runs, default `30000`
+- `HIGH_SCORE_MAX_TIME_MS` optionally caps the slowest acceptable run
 
 ## 11. Deployment
 
@@ -244,7 +268,7 @@ FRONTEND_ENV_FILE
 LARAVEL_ENV_FILE
 ```
 
-The generated production `.htaccess` routes `/api/*` to Laravel and falls back to `index.html` for React Router. The frontend should use `VITE_CONTACT_API_URL=https://rzeczko.com/api/contact` when that rewrite is active.
+The generated production `.htaccess` routes `/api/*` to Laravel and falls back to `index.html` for React Router. The frontend should use `VITE_CONTACT_API_URL=https://rzeczko.com/api/contact` and `VITE_HIGH_SCORES_API_URL=https://rzeczko.com/api/high-scores` when that rewrite is active.
 
 Full setup notes live in [`docs/deployment-siteground.md`](./docs/deployment-siteground.md).
 
@@ -258,11 +282,11 @@ npm run build
 cd ../backend
 composer install
 php artisan test --filter=ContactApiTest
+php artisan test --filter=HighScoreApiTest
 ```
 
 ## 12. Future Features
 
-- global leaderboard and run tracking
 - achievement system tied to codex completion and boss clears
 - mobile-first gameplay and controls optimization
 - multiplayer challenge or asynchronous score mode
@@ -270,6 +294,7 @@ php artisan test --filter=ContactApiTest
 - expanded codex system with richer unlockables and animated reveals
 - save-state or profile progression support
 - analytics or recruiter engagement insights for portfolio review paths
+- richer Hall of Fame filters, seasonality, or anti-cheat review tools
 
 ## 13. Local Development
 
@@ -289,14 +314,26 @@ cd backend
 cp .env.example .env
 composer install
 php artisan key:generate
-php artisan serve
+php artisan migrate
+php artisan serve --host=127.0.0.1 --port=8001
 ```
 
 ### Environment Notes
 
-- Set `VITE_CONTACT_API_URL=http://127.0.0.1:8000/api/contact` for local frontend-to-backend communication.
+- Set `VITE_CONTACT_API_URL=http://127.0.0.1:8001/api/contact` for local frontend-to-backend communication.
+- Set `VITE_HIGH_SCORES_API_URL=http://127.0.0.1:8001/api/high-scores` for local Hall of Fame requests.
 - Configure backend mail credentials before testing contact delivery.
 - Provide `RECAPTCHA_SECRET_KEY` on the backend and `VITE_RECAPTCHA_SITE_KEY` on the frontend when enabling the production contact flow.
+- Run backend migrations before testing the Hall of Fame locally; the leaderboard depends on the `high_scores` table.
+- If another local project already occupies port `8000`, keep this repo on `8001` to avoid cross-project API confusion.
+
+### Focused Test Commands
+
+```bash
+cd backend
+php artisan test --filter=ContactApiTest
+php artisan test --filter=HighScoreApiTest
+```
 
 ## 14. Credits
 

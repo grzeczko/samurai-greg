@@ -4,6 +4,7 @@ import { resumeData, resumeLinks } from '../data/resumeData.js';
 import ResumeDownloadButtons from './ResumeDownloadButtons.jsx';
 
 const inlineLinks = [
+  { text: 'Rzeczko.com', href: resumeLinks.interactiveResume },
   { text: 'www.musicbattlex.com', href: 'https://www.musicbattlex.com' },
   { text: 'www.themusichutch.com', href: 'https://www.themusichutch.com' },
   { text: 'MusicBattleX.com', href: resumeLinks.musicBattleX },
